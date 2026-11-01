@@ -1,0 +1,12 @@
+{
+  "name": "the-golden-journey",
+  "version": "4.0.0",
+  "description": "THE GOLDEN JOURNEY (HÀNH TRÌNH VÀNG SON) — 3D Geography & Economics Strategy Board Game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

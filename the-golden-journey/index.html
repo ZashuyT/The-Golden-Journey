@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>THE GOLDEN JOURNEY — Hành Trình Vàng Son</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <!-- 3D WebGL Viewport -->
+    <div id="canvas-container"></div>
+
+    <!-- =========================================================================
+         CLEAN PRE-GAME LOBBY OVERLAY (WELCOME -> CREATE / BROWSE -> ROOM LOBBY)
+         ========================================================================= -->
+    <div id="waiting-screen-overlay" class="waiting-screen-overlay">
+        <div class="waiting-screen-container">
+            <div id="waiting-screen-body"></div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         MINIMALIST IN-GAME HUD (CLEAN, UNOBTRUSIVE, EASY ON THE EYES)
+         ========================================================================= -->
+    <header id="top-hud-bar" class="top-hud-bar hidden-hud">
+        <div class="hud-top-left">
+            <div class="brand-badge">
+                <span class="brand-icon">⛵</span>
+                <span class="brand-name">Hành Trình Vàng Son</span>
+            </div>
+            <div id="hud-round" class="hud-pill round-pill">Vòng 1</div>
+            <div id="hud-my-ship" class="hud-pill ship-pill">Thuyền của bạn: --</div>
+            <div id="hud-turn-status" class="hud-pill turn-pill my-turn">Lượt của bạn</div>
+            <div id="room-code-pill" class="hud-pill room-pill hidden" title="Nhấn để mở Phòng Chờ">Phòng: ----</div>
+        </div>
+
+        <div class="hud-top-right">
+            <select id="weather-selector" class="hud-icon-btn" title="Thời tiết">
+                <option value="sunny">☀️ Nắng đẹp</option>
+                <option value="sunset">🌅 Hoàng hôn</option>
+                <option value="night">🌙 Đêm sao</option>
+                <option value="rain">🌧️ Mưa biển</option>
+                <option value="storm">⛈️ Giông bão</option>
+            </select>
+            <button id="btn-open-market" class="hud-icon-btn" title="Chợ Hàng Hải">
+                ⚖️ Chợ (<span id="market-count-badge">3</span>)
+            </button>
+            <button id="btn-open-atlas" class="hud-icon-btn" title="Cẩm nang 6 Vùng & Di tích">🗺️ Cẩm nang</button>
+            <button id="btn-open-rules" class="hud-icon-btn" title="Luật chơi">📜 Luật</button>
+            <button id="btn-reset-cam" class="hud-icon-btn" title="Đưa góc nhìn về thuyền của bạn">🎯</button>
+            <button id="btn-toggle-clean-ui" class="hud-icon-btn" title="Ẩn/Hiện bảng điều khiển">👁️</button>
+            <button id="btn-toggle-audio" class="hud-icon-btn" title="Bật/Tắt âm thanh">🔊</button>
+            <button id="btn-open-room" class="hud-icon-btn exit-btn" title="Sảnh phòng chờ">🚪 Sảnh</button>
+        </div>
+    </header>
+
+    <!-- LEFT MINI PANEL: COMPACT PLAYER ROSTER -->
+    <aside id="left-hud-panel" class="left-hud-panel hidden-hud">
+        <div id="panel-roster" class="hud-card">
+            <div class="hud-card-header" onclick="window.GAME.togglePanel('panel-roster')">
+                <span class="hud-card-title-text">Hải Đội Trong Trận (Đạt 3 👑 = Thắng)</span>
+                <button class="panel-collapse-btn">－</button>
+            </div>
+            <div class="hud-card-body">
+                <div id="fleet-roster"></div>
+            </div>
+        </div>
+
+        <div id="panel-log" class="hud-card collapsed">
+            <div class="hud-card-header" onclick="window.GAME.togglePanel('panel-log')">
+                <span class="hud-card-title-text">Nhật Ký Hải Trình</span>
+                <button class="panel-collapse-btn">＋</button>
+            </div>
+            <div class="hud-card-body">
+                <div id="game-log-list" class="log-list"></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- RIGHT COMPACT PANEL: CAPTAIN CONTROL DOCK -->
+    <aside id="right-hud-panel" class="right-hud-panel hidden-hud">
+        <div id="panel-captain" class="hud-card">
+            <div class="hud-card-header" onclick="window.GAME.togglePanel('panel-captain')">
+                <div class="captain-header-inline">
+                    <span id="active-player-dot" class="captain-dot"></span>
+                    <div>
+                        <div id="active-player-name" class="captain-name">Thuyền Trưởng</div>
+                        <div id="active-player-vessel" class="captain-vessel">Chiến thuyền</div>
+                    </div>
+                </div>
+                <button class="panel-collapse-btn">－</button>
+            </div>
+
+            <div class="hud-card-body">
+                <!-- Clean 4-Metric Bar -->
+                <div class="stats-compact-grid">
+                    <div class="stat-box">
+                        <span class="stat-label">Hành động</span>
+                        <strong id="stat-ap" class="stat-val accent-sky">4 / 4 AP</strong>
+                        <small id="stat-move-steps" class="stat-sub">Tối đa 6 ô (3 AP)</small>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Độ bền (HP)</span>
+                        <strong id="stat-hp" class="stat-val accent-rose">5 / 5 ❤️</strong>
+                        <small class="stat-sub">Đóng tàu / Sửa</small>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Ngân khố</span>
+                        <strong id="stat-coins" class="stat-val accent-amber">1 / 10 🪙</strong>
+                        <small id="stat-cargo" class="stat-sub">Khoang: 2/8</small>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Bảo vật</span>
+                        <strong id="stat-relics" class="stat-val accent-emerald">0 / 3 👑</strong>
+                        <small class="stat-sub">Mục tiêu thắng</small>
+                    </div>
+                </div>
+
+                <!-- 6 Core Resources & Keys Strip -->
+                <div class="inventory-strip">
+                    <div class="inv-cell" title="Lương thực">🌾 Lúa <span id="inv-food">1</span></div>
+                    <div class="inv-cell" title="Gỗ đóng tàu">🌲 Gỗ <span id="inv-wood">1</span></div>
+                    <div class="inv-cell" title="Quặng sắt">⛏️ Sắt <span id="inv-iron">0</span></div>
+                    <div class="inv-cell" title="Chìa khóa Cấp 1 (Dễ)">🗝️ K1 <span id="inv-k1">0</span></div>
+                    <div class="inv-cell" title="Chìa khóa Cấp 2 (Vừa)">🗝️ K2 <span id="inv-k2">0</span></div>
+                    <div class="inv-cell" title="Chìa khóa Cấp 3 (Khó)">🗝️ K3 <span id="inv-k3">0</span></div>
+                </div>
+
+                <!-- Compact Cargo & Relics Tags -->
+                <div class="cargo-compact-box">
+                    <div id="inv-specialties" class="cargo-tags-row"></div>
+                    <div id="inv-relics-list" class="cargo-tags-row"></div>
+                </div>
+
+                <!-- Primary & Secondary Controls -->
+                <div class="action-buttons-stack">
+                    <button id="btn-context-action" class="btn-action primary-action">
+                        ⚓ Giao Thương Tại Cảng (1 AP)
+                    </button>
+                    <div class="secondary-actions-row">
+                        <button id="btn-repair-ship" class="btn-action repair-action" title="1 AP + 1 Xu + 1 Gỗ = +1 HP">
+                            🛠️ Sửa Tàu (+1 HP)
+                        </button>
+                        <button id="btn-end-turn" class="btn-action end-turn-action">
+                            ⏭️ Kết Thúc Lượt
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- FLOATING HEX HOVER TOOLTIP -->
+    <div id="hex-tooltip" class="hex-tooltip hidden"></div>
+
+    <!-- TOAST BANNER -->
+    <div id="toast-banner" class="toast-banner hidden"></div>
+
+    <!-- UNIVERSAL INTERACTIVE MODAL (QUIZZES, MONUMENTS, PORTS, POPUPS) -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div id="modal-content" class="modal-card"></div>
+    </div>
+
+    <!-- GAME SCRIPTS -->
+    <script src="js/data.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/models.js"></script>
+    <script src="js/world3d.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
