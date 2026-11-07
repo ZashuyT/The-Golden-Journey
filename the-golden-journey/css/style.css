@@ -491,47 +491,51 @@ body, html {
     color: var(--text-secondary);
 }
 
-/* Left & Right Floating Panels */
+/* Left & Right Floating Panels (Compact & Freely Draggable) */
 .left-hud-panel {
-    position: absolute;
-    top: 66px;
-    left: 14px;
-    width: 248px;
-    z-index: 10;
+    position: fixed;
+    top: 60px;
+    left: 12px;
+    width: 246px;
+    z-index: 12;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    max-height: calc(100vh - 80px);
+    gap: 6px;
+    max-height: calc(100vh - 72px);
 }
 
 .right-hud-panel {
-    position: absolute;
-    top: 66px;
-    right: 14px;
-    width: 296px;
-    z-index: 10;
+    position: fixed;
+    top: 60px;
+    right: 12px;
+    width: 268px;
+    z-index: 12;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .hud-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(16px);
+    background: rgba(15, 23, 42, 0.78);
+    backdrop-filter: blur(14px);
     border: 1px solid var(--glass-border);
-    border-radius: 14px;
-    padding: 11px 13px;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    padding: 9px 11px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42);
 }
 
 .hud-card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    cursor: pointer;
-    padding-bottom: 8px;
-    margin-bottom: 8px;
+    cursor: grab;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
     border-bottom: 1px solid var(--glass-border);
+}
+
+.hud-card-header:active {
+    cursor: grabbing;
 }
 
 .hud-card.collapsed .hud-card-header {
@@ -1502,3 +1506,286 @@ body, html {
     padding: 14px;
     text-align: center;
 }
+
+/* ============================================================================
+   5. V4.5 ENHANCEMENTS: 10S PRE-GAME COUNTDOWN, DRAGGABLE WINDOWS,
+      SPECTATOR QUIZ TOGGLE, QUESTION RECAP, PORT WALLET & 15S VICTORY
+   ============================================================================ */
+.pregame-countdown-banner {
+    position: fixed;
+    top: 68px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 45;
+    width: 92%;
+    max-width: 580px;
+    pointer-events: none;
+}
+
+.pregame-countdown-card {
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(16px);
+    border: 2px solid rgba(251, 191, 36, 0.65);
+    border-radius: 16px;
+    padding: 16px 22px;
+    text-align: center;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.68);
+}
+
+.pregame-badge {
+    display: inline-block;
+    background: rgba(251, 191, 36, 0.18);
+    color: var(--accent-amber);
+    font-size: 11.5px;
+    font-weight: 800;
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+}
+
+.pregame-countdown-card h2 {
+    font-size: 22px;
+    font-weight: 800;
+    color: #ffffff;
+    margin-bottom: 6px;
+}
+
+.pregame-countdown-card h2 span {
+    color: var(--accent-amber);
+    font-size: 28px;
+}
+
+.pregame-countdown-card p {
+    font-size: 12.5px;
+    color: #cbd5e1;
+    line-height: 1.45;
+    margin-bottom: 12px;
+}
+
+.pregame-progress-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(30, 41, 59, 0.9);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.pregame-progress-bar {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #38bdf8, #fbbf24);
+    transition: width 0.25s linear;
+}
+
+/* Spectator Active Turn Strip inside Your Personal Ship Panel */
+.spectator-turn-strip {
+    background: rgba(56, 189, 248, 0.14);
+    border: 1px solid rgba(56, 189, 248, 0.36);
+    border-radius: 9px;
+    padding: 7px 9px;
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+/* Top HUD Spectator Quiz Toggle Pill */
+.quiz-toggle-pill {
+    border: 1px solid rgba(251, 191, 36, 0.55);
+    background: rgba(251, 191, 36, 0.18);
+    color: var(--accent-amber);
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.15s;
+}
+
+.quiz-toggle-pill:hover:not(:disabled) {
+    background: rgba(251, 191, 36, 0.30);
+}
+
+.quiz-toggle-pill:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    border-color: rgba(148, 163, 184, 0.35);
+    background: rgba(30, 41, 59, 0.75);
+    color: #94a3b8;
+}
+
+.market-always-btn {
+    background: rgba(52, 211, 153, 0.18);
+    border-color: rgba(52, 211, 153, 0.45);
+    color: #a7f3d0;
+}
+
+/* Question Recap inside Post-Quiz Visual Memory Card */
+.memory-question-recap {
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(56, 189, 248, 0.38);
+    border-left: 4px solid var(--accent-sky);
+    border-radius: 9px;
+    padding: 10px 13px;
+    margin-bottom: 10px;
+    font-size: 13.5px;
+    color: #f8fafc;
+    line-height: 1.45;
+}
+
+/* Port & Market Wallet Status Bar */
+.port-wallet-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    border-radius: 11px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 12.5px;
+}
+
+/* Modal Drag Header Bar */
+.modal-drag-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+    cursor: grab;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.modal-drag-bar:active {
+    cursor: grabbing;
+}
+
+/* Victory 15s Countdown Box */
+.victory-countdown-box {
+    background: rgba(52, 211, 153, 0.14);
+    border: 1px solid rgba(52, 211, 153, 0.45);
+    border-radius: 11px;
+    padding: 12px 16px;
+    margin-top: 12px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #a7f3d0;
+}
+
+/* Live Trade Bulletin Board (Bảng Tin Giao Thương Hiện Tại) */
+.bulletin-open-btn {
+    background: rgba(52, 211, 153, 0.18);
+    color: #a7f3d0;
+    border: 1px solid rgba(52, 211, 153, 0.42);
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 10.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.bulletin-open-btn:hover {
+    background: rgba(52, 211, 153, 0.32);
+}
+
+.trade-bulletin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 155px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.bulletin-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    background: rgba(30, 41, 59, 0.62);
+    border: 1px solid rgba(251, 191, 36, 0.25);
+    border-radius: 8px;
+    padding: 5px 7px;
+}
+
+.bulletin-item-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.bulletin-item-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #fbbf24;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bulletin-item-sub {
+    font-size: 10px;
+    color: #cbd5e1;
+}
+
+.bulletin-buy-btn {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #0f172a;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 7px;
+    font-size: 10.5px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: transform 0.12s, filter 0.12s;
+}
+
+.bulletin-buy-btn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+.bulletin-buy-btn.own-item {
+    background: rgba(71, 85, 105, 0.85);
+    color: #e2e8f0;
+    font-weight: 600;
+}
+
+.bulletin-empty {
+    font-size: 10.5px;
+    color: #94a3b8;
+    font-style: italic;
+    padding: 4px 2px;
+}
+
+.trade-bulletin-news {
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px dashed rgba(148, 163, 184, 0.22);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 76px;
+    overflow-y: auto;
+}
+
+.bulletin-news-item {
+    font-size: 10px;
+    color: #cbd5e1;
+    line-height: 1.32;
+    background: rgba(15, 23, 42, 0.55);
+    padding: 3px 6px;
+    border-radius: 5px;
+    border-left: 2px solid #38bdf8;
+}
+

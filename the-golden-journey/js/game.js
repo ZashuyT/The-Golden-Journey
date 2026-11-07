@@ -27,18 +27,29 @@ class GoldenJourneyGame {
         // Rare Golden/Silver Axe NPC Spawner state (Spawns every 4-5 rounds!)
         this.nextNPCSpawnRound = 4;
 
-        // Shared Maritime Market Floor
+        // Shared Maritime Market Floor & Live Trade Bulletin Board
         this.marketListings = [];
         this.nextListingId = 1;
+        this.tradeBulletinNotices = [];
 
         // Live Shared Quiz Broadcast state (synced to all players in room)
         this.liveQuizState = null;
         this.showingSpectatorQuizId = null;
+        this.spectatorClosedAskingQuizId = null;
+        this.spectatorHiddenAnsweredQuizId = null;
+        this.lastSpectatorQuizSnapshot = null;
 
-        // Opening Turn-Order Speed Quiz state
+        // Match Victory state (synced to all players + 15s auto-return to room lobby)
+        this.matchWinner = null;
+        this.victoryShownForMatch = false;
+        this.victoryCountdownInterval = null;
+
+        // Opening Turn-Order Speed Quiz state + 10s Pre-Game Countdown
         this.openingQuizState = null;
         this.openingQuizStartMs = 0;
         this.openingTimerInterval = null;
+        this.preGameCountdownInterval = null;
+        this.isPreGameCountingDown = false;
         this.hasSubmittedOpeningAnswer = false;
         this.localOpeningChoice = null;
         this.localOpeningElapsedMs = 0;
@@ -878,25 +889,72 @@ class GoldenJourneyGame {
     startOpeningSpeedQuizModal(openingQuizObj) {
         if (!openingQuizObj || !openingQuizObj.quiz) return;
         this.openingQuizState = openingQuizObj;
-        this.openingQuizStartMs = Date.now();
         this.hasSubmittedOpeningAnswer = false;
         this.localOpeningChoice = null;
         this.localOpeningElapsedMs = 0;
+        this.matchWinner = null;
+        this.victoryShownForMatch = false;
 
         clearInterval(this.openingTimerInterval);
-        this.renderOpeningSpeedQuizView();
+        clearInterval(this.preGameCountdownInterval);
 
-        this.openingTimerInterval = setInterval(() => {
-            if (this.hasSubmittedOpeningAnswer) {
-                clearInterval(this.openingTimerInterval);
-                return;
+        // Close any open modal so players can see the 3D S-shaped Vietnam map & their starting ship first!
+        document.getElementById("modal-overlay").classList.add("hidden");
+
+        const localP = this.getLocalPlayer();
+        if (localP) {
+            this.world.focusCameraOnHex(localP.q, localP.r);
+        }
+
+        // 10-Second Pre-Game Countdown before showing the Opening Turn-Order Speed Quiz
+        const banner = document.getElementById("pregame-countdown-banner");
+        const secEl = document.getElementById("pregame-countdown-sec");
+        const barEl = document.getElementById("pregame-progress-bar");
+
+        let remainingSec = 10;
+        if (openingQuizObj.countdownEndsAt) {
+            const diffSec = Math.ceil((openingQuizObj.countdownEndsAt - Date.now()) / 1000);
+            if (diffSec >= 1 && diffSec <= 12) {
+                remainingSec = Math.min(10, diffSec);
             }
-            const timerEl = document.getElementById("opening-speed-timer");
-            if (timerEl) {
-                const elapsedSec = ((Date.now() - this.openingQuizStartMs) / 1000).toFixed(1);
-                timerEl.textContent = `⏱️ ${elapsedSec}s`;
+        }
+
+        this.isPreGameCountingDown = true;
+        if (banner) banner.classList.remove("hidden");
+        if (secEl) secEl.textContent = String(remainingSec);
+        if (barEl) barEl.style.width = `${(remainingSec / 10) * 100}%`;
+
+        const launchQuizNow = () => {
+            clearInterval(this.preGameCountdownInterval);
+            this.isPreGameCountingDown = false;
+            if (banner) banner.classList.add("hidden");
+
+            this.openingQuizStartMs = Date.now();
+            window.SFX.playTurnStart();
+            this.renderOpeningSpeedQuizView();
+
+            this.openingTimerInterval = setInterval(() => {
+                if (this.hasSubmittedOpeningAnswer) {
+                    clearInterval(this.openingTimerInterval);
+                    return;
+                }
+                const timerEl = document.getElementById("opening-speed-timer");
+                if (timerEl) {
+                    const elapsedSec = ((Date.now() - this.openingQuizStartMs) / 1000).toFixed(1);
+                    timerEl.textContent = `⏱️ ${elapsedSec}s`;
+                }
+            }, 100);
+        };
+
+        this.preGameCountdownInterval = setInterval(() => {
+            remainingSec -= 1;
+            if (remainingSec <= 0) {
+                launchQuizNow();
+            } else {
+                if (secEl) secEl.textContent = String(remainingSec);
+                if (barEl) barEl.style.width = `${Math.max(0, (remainingSec / 10) * 100)}%`;
             }
-        }, 100);
+        }, 1000);
     }
 
     renderOpeningSpeedQuizView() {
@@ -1216,6 +1274,15 @@ class GoldenJourneyGame {
                         return;
                     }
 
+                    // 3b. Transitioned from Playing -> Waiting (After 15s Victory Celebration)
+                    if (prevStatus !== "waiting" && r.status === "waiting") {
+                        clearInterval(this.victoryCountdownInterval);
+                        document.getElementById("modal-overlay").classList.add("hidden");
+                        this.showWaitingScreen();
+                        this.showToast("🏁 Ván đấu đã kết thúc — Toàn bộ người chơi đã trở lại Phòng chờ!");
+                        return;
+                    }
+
                     // 4. Live Match Synchronization (Shared Map + Live Spectator Quiz)
                     if (r.status === "playing" && r.gameState && versionChanged && !this.isBusy) {
                         this.applySerializedGameState(r.gameState, false);
@@ -1246,9 +1313,11 @@ class GoldenJourneyGame {
             monumentAssignments: this.monumentAssignments,
             players: this.players,
             marketListings: this.marketListings,
+            tradeBulletinNotices: this.tradeBulletinNotices,
             resourceCooldowns,
             rareNPCHex,
-            liveQuizState: this.liveQuizState
+            liveQuizState: this.liveQuizState,
+            matchWinner: this.matchWinner
         };
     }
 
@@ -1266,6 +1335,9 @@ class GoldenJourneyGame {
         this.roundNumber = state.roundNumber;
         this.activePlayerIdx = state.activePlayerIdx;
         this.marketListings = state.marketListings || this.marketListings;
+        if (Array.isArray(state.tradeBulletinNotices)) {
+            this.tradeBulletinNotices = state.tradeBulletinNotices;
+        }
         this.players = state.players;
 
         if (state.resourceCooldowns) {
@@ -1282,19 +1354,24 @@ class GoldenJourneyGame {
             this.world.syncShipsSmoothly(this.players);
         }
 
-        // Handle Live Shared Quiz Broadcast for Spectators
-        this.liveQuizState = state.liveQuizState || null;
-        if (!this.isMyTurn()) {
-            if (this.liveQuizState) {
-                this.renderSpectatorLiveQuiz(this.liveQuizState);
-            } else if (this.showingSpectatorQuizId) {
-                this.showingSpectatorQuizId = null;
-                this.closeModal(true);
-            }
+        // Check if someone won the match (3 Royal Relics) -> Show Victory Celebration Screen for ALL players!
+        const winnerFromState = state.matchWinner || this.players.find(pl => pl.relics && pl.relics.length >= 3);
+        if (winnerFromState && !this.victoryShownForMatch) {
+            this.matchWinner = winnerFromState;
+            this.refreshReachableHexes();
+            this.updateUI();
+            this.showVictoryScreen(winnerFromState);
+            return;
         }
 
-        // If turn just switched to a new player
+        // If turn just switched to a new player, reset spectator quiz snapshots
         if (prevActiveIdx !== this.activePlayerIdx || prevRound !== this.roundNumber) {
+            this.showingSpectatorQuizId = null;
+            this.spectatorClosedAskingQuizId = null;
+            this.spectatorHiddenAnsweredQuizId = null;
+            this.lastSpectatorQuizSnapshot = null;
+            this.updateSpectatorQuizPillUI();
+
             const activeP = this.getActivePlayer();
             if (activeP) {
                 if (this.isMyTurn()) {
@@ -1306,6 +1383,20 @@ class GoldenJourneyGame {
                     setTimeout(() => this.executeAITurn(), 750);
                 }
             }
+        }
+
+        // Handle Live Shared Quiz Broadcast for Spectators (with Close/Reopen rules)
+        this.liveQuizState = state.liveQuizState || null;
+        if (!this.isMyTurn()) {
+            if (this.liveQuizState) {
+                if (this.liveQuizState.phase === "answered") {
+                    this.lastSpectatorQuizSnapshot = JSON.parse(JSON.stringify(this.liveQuizState));
+                }
+                this.renderSpectatorLiveQuiz(this.liveQuizState);
+            }
+            this.updateSpectatorQuizPillUI();
+        } else {
+            this.updateSpectatorQuizPillUI();
         }
 
         this.refreshReachableHexes();
@@ -1387,18 +1478,27 @@ class GoldenJourneyGame {
     }
 
     // ------------------------------------------------------------------------
-    // SPECTATOR LIVE QUIZ RENDERER (ALL PLAYERS SEE QUIZZES; ONLY ACTIVE ANSWERS)
+    // SPECTATOR LIVE QUIZ RENDERER & CLOSE / REOPEN SYSTEM
+    // - Spectators can close the asking quiz at any time to interact with map/market.
+    // - Once closed during "asking", it CANNOT be reopened until the active player answers!
+    // - Once answered ("answered"), spectators can freely open/close the result modal at any time!
     // ------------------------------------------------------------------------
-    renderSpectatorLiveQuiz(liveQuiz) {
+    renderSpectatorLiveQuiz(liveQuiz, forceShow = false) {
         if (!liveQuiz || !liveQuiz.quiz) return;
         this.showingSpectatorQuizId = liveQuiz.id;
         const quiz = liveQuiz.quiz;
 
         if (liveQuiz.phase === "asking") {
+            // If spectator already closed this asking quiz, do NOT reopen it until active player answers!
+            if (this.spectatorClosedAskingQuizId === liveQuiz.id && !forceShow) {
+                this.updateSpectatorQuizPillUI();
+                return;
+            }
+
             const html = `
                 <div class="spectator-quiz-banner">
                     <span>👁️ ĐANG XEM LƯỢT CỦA <strong>${liveQuiz.actorName.toUpperCase()}</strong></span>
-                    <span class="badge-tag">Chế độ Quan sát (Chỉ ${liveQuiz.actorName} được chọn đáp án)</span>
+                    <span class="badge-tag">Chỉ ${liveQuiz.actorName} được chọn đáp án</span>
                 </div>
                 <div class="modal-header-badge" style="background:${liveQuiz.badgeColor || '#2d6878'}33; border-color:${liveQuiz.badgeColor || '#5c9ead'}">
                     <span>${liveQuiz.badgeTitle || '❓ CÂU HỎI ĐỊA LÝ TRỰC TIẾP TRÊN BẢN ĐỒ CHUNG'}</span>
@@ -1416,12 +1516,26 @@ class GoldenJourneyGame {
                         `).join("")}
                     </div>
                 </div>
-                <div style="text-align:center; font-size:12.5px; color:#e5c365; font-weight:700; margin-top:6px">
-                    ⏳ Đang chờ ${liveQuiz.actorName} suy nghĩ và chọn đáp án...
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px">
+                    <div style="font-size:12px; color:#e5c365; font-weight:700">
+                        ⏳ Đang chờ ${liveQuiz.actorName} suy nghĩ và chọn đáp án...
+                    </div>
+                    <button class="btn-secondary" onclick="window.GAME.spectatorCloseQuizDuringAsking('${liveQuiz.id}')">
+                        ✕ Đóng Cửa Sổ (Sẽ mở lại khi ${liveQuiz.actorName} trả lời xong)
+                    </button>
                 </div>
             `;
             this.showModal(html);
+            this.updateSpectatorQuizPillUI();
         } else if (liveQuiz.phase === "answered") {
+            this.lastSpectatorQuizSnapshot = JSON.parse(JSON.stringify(liveQuiz));
+
+            if (this.spectatorHiddenAnsweredQuizId === liveQuiz.id && !forceShow) {
+                this.updateSpectatorQuizPillUI();
+                return;
+            }
+            this.spectatorHiddenAnsweredQuizId = null;
+
             const chosenIdx = liveQuiz.chosenIdx;
             const isCorrect = (chosenIdx === quiz.correct);
             const chosenLetter = String.fromCharCode(65 + chosenIdx);
@@ -1429,15 +1543,95 @@ class GoldenJourneyGame {
             const html = `
                 <div class="spectator-quiz-banner">
                     <span>👁️ KẾT QUẢ TRẢ LỜI CỦA <strong>${liveQuiz.actorName.toUpperCase()}</strong>: Chọn phương án <strong>${chosenLetter}</strong> (${isCorrect ? '✅ CHÍNH XÁC' : '❌ CHƯA ĐÚNG'})</span>
-                    <span class="badge-tag">Cùng ghi nhớ kiến thức Địa lý</span>
+                    <span class="badge-tag">Có thể Đóng / Mở lại bất cứ lúc nào</span>
                 </div>
                 <h2 class="modal-title">${liveQuiz.outcomeTitle || `Kết Quả Khảo Nghiệm Của ${liveQuiz.actorName}`}</h2>
                 ${this.renderQuizVisualMemoryCard(quiz, chosenIdx, liveQuiz.actorName)}
-                <div class="modal-actions">
-                    <button class="btn-secondary" onclick="window.GAME.closeModal(true)">Đóng Cửa Sổ Quan Sát</button>
+                <div class="modal-actions" style="justify-content:space-between">
+                    <span style="font-size:11.5px; color:#94a3b8">💡 Bạn có thể bấm nút <strong>"👁️ Mở/Đóng Quiz"</strong> trên thanh công cụ trên cùng để xem lại bất cứ lúc nào trong lượt này.</span>
+                    <button class="btn-secondary" onclick="window.GAME.spectatorHideAnsweredQuiz('${liveQuiz.id}')">
+                        ✕ Tạm Đóng Cửa Sổ Quiz
+                    </button>
                 </div>
             `;
             this.showModal(html);
+            this.updateSpectatorQuizPillUI();
+        }
+    }
+
+    spectatorCloseQuizDuringAsking(quizId) {
+        this.spectatorClosedAskingQuizId = quizId;
+        document.getElementById("modal-overlay").classList.add("hidden");
+        this.updateSpectatorQuizPillUI();
+        const actorName = (this.liveQuizState && this.liveQuizState.actorName) ? this.liveQuizState.actorName : "người chơi trong lượt";
+        this.showToast(`👁️ Đã đóng cửa sổ câu hỏi để bạn tự do tương tác. Cửa sổ chỉ có thể mở lại sau khi ${actorName} đã trả lời đáp án!`);
+    }
+
+    spectatorHideAnsweredQuiz(quizId) {
+        this.spectatorHiddenAnsweredQuizId = quizId;
+        document.getElementById("modal-overlay").classList.add("hidden");
+        this.updateSpectatorQuizPillUI();
+    }
+
+    toggleSpectatorQuizModal() {
+        if (this.isMyTurn()) return;
+        const activeQuiz = this.liveQuizState || this.lastSpectatorQuizSnapshot;
+        if (!activeQuiz) return;
+
+        if (activeQuiz.phase === "asking") {
+            if (this.spectatorClosedAskingQuizId === activeQuiz.id) {
+                this.showToast(`⏳ Bạn đã đóng cửa sổ câu hỏi! Chỉ có thể mở lại sau khi ${activeQuiz.actorName} đã trả lời đáp án.`);
+                return;
+            }
+            // Currently open -> close it
+            this.spectatorCloseQuizDuringAsking(activeQuiz.id);
+            return;
+        }
+
+        if (activeQuiz.phase === "answered") {
+            const overlay = document.getElementById("modal-overlay");
+            const isHidden = overlay.classList.contains("hidden");
+            if (isHidden) {
+                this.spectatorHiddenAnsweredQuizId = null;
+                this.renderSpectatorLiveQuiz(activeQuiz, true);
+            } else {
+                this.spectatorHideAnsweredQuiz(activeQuiz.id);
+            }
+        }
+    }
+
+    updateSpectatorQuizPillUI() {
+        const pill = document.getElementById("spectator-quiz-toggle-pill");
+        if (!pill) return;
+
+        if (this.isMyTurn()) {
+            pill.classList.add("hidden");
+            return;
+        }
+
+        const activeQuiz = this.liveQuizState || this.lastSpectatorQuizSnapshot;
+        if (!activeQuiz) {
+            pill.classList.add("hidden");
+            return;
+        }
+
+        pill.classList.remove("hidden");
+        const overlay = document.getElementById("modal-overlay");
+        const isModalOpen = overlay && !overlay.classList.contains("hidden");
+
+        if (activeQuiz.phase === "asking") {
+            if (this.spectatorClosedAskingQuizId === activeQuiz.id) {
+                pill.className = "spectator-quiz-pill locked-asking";
+                pill.innerHTML = `🔒 Đã đóng Quiz (Chờ ${activeQuiz.actorName} trả lời...)`;
+            } else {
+                pill.className = "spectator-quiz-pill can-toggle";
+                pill.innerHTML = `✕ Đóng Quiz của ${activeQuiz.actorName}`;
+            }
+        } else if (activeQuiz.phase === "answered") {
+            pill.className = "spectator-quiz-pill can-toggle";
+            pill.innerHTML = isModalOpen
+                ? `👁️ Đóng Kết Quả Quiz (${activeQuiz.actorName})`
+                : `👁️ Xem Lại Câu Hỏi & Đáp Án (${activeQuiz.actorName})`;
         }
     }
 
@@ -1457,7 +1651,7 @@ class GoldenJourneyGame {
 
     toggleAllPanelsCleanMode() {
         this.cleanUIMode = !this.cleanUIMode;
-        const panels = ["panel-regions", "panel-roster", "panel-captain", "panel-log"];
+        const panels = ["panel-regions", "panel-roster", "panel-trade-bulletin", "panel-captain", "panel-log"];
         panels.forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -1476,7 +1670,7 @@ class GoldenJourneyGame {
     }
 
     // ------------------------------------------------------------------------
-    // QUIZ SHUFFLER + POST-QUIZ VISUAL MEMORY CARD (WITH VERIFIED CITATIONS)
+    // QUIZ SHUFFLER + POST-QUIZ VISUAL MEMORY CARD (WITH QUESTION RECAP & CITATIONS)
     // ------------------------------------------------------------------------
     prepareShuffledQuiz(rawQuiz) {
         const indexedOptions = rawQuiz.options.map((text, idx) => ({
@@ -1510,6 +1704,9 @@ class GoldenJourneyGame {
 
         return `
             <div class="quiz-memory-card">
+                <div class="memory-question-recap">
+                    ❓ <strong>Câu hỏi:</strong> ${quiz.q}
+                </div>
                 <div class="answer-verdict-strip ${isCorrect ? 'verdict-correct' : 'verdict-wrong'}">
                     <div class="verdict-user-choice">
                         ${isCorrect
@@ -1547,32 +1744,56 @@ class GoldenJourneyGame {
     }
 
     randomizeMonumentTiers() {
-        const tiers = [1, 1, 1, 2, 2, 2, 3, 3, 3];
-        for (let i = tiers.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [tiers[i], tiers[j]] = [tiers[j], tiers[i]];
-        }
+        // Zoned Monument Balancing across the S-shaped Vietnam Map:
+        // North (3 monuments), Central (3 monuments), South (3 monuments) each receive 1 Easy (Tier 1), 1 Medium (Tier 2), and 1 Hard (Tier 3)
+        // so no player ever spawns surrounded only by Tier 2/3 monuments or too many Tier 1 monuments!
+        const zones = [
+            ["mon_sapa", "mon_halong", "mon_vanmieu"],
+            ["mon_phongnha", "mon_hue", "mon_myson"],
+            ["mon_taynguyen", "mon_bennharong", "mon_cairang"]
+        ];
         const map = {};
-        window.GAME_DATA.monuments.forEach((m, idx) => {
-            map[m.id] = tiers[idx];
+        zones.forEach(zoneIds => {
+            const zTiers = [1, 2, 3];
+            for (let i = zTiers.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [zTiers[i], zTiers[j]] = [zTiers[j], zTiers[i]];
+            }
+            zoneIds.forEach((id, idx) => {
+                map[id] = zTiers[idx];
+            });
         });
         return map;
     }
 
     generateFairOuterRimSpawns(count) {
-        const rimTiles = this.world.hexTiles.filter(t => t.isSpawnRim && t.navigable);
-        rimTiles.sort((a, b) => a.r - b.r);
+        // Use the pre-calibrated fair anchorages along the S-shaped Vietnam coast
+        // (Each anchorage is 3-4 water hexes from the nearest Port, Monument, and Resource node)
+        const anchors = (this.world.fairSpawnAnchors && this.world.fairSpawnAnchors.length >= 5)
+            ? this.world.fairSpawnAnchors
+            : this.world.hexTiles.filter(t => t.isSpawnRim && t.navigable);
 
-        const chosen = [];
-        const bandSize = rimTiles.length / count;
-        for (let i = 0; i < count; i++) {
-            const startIdx = Math.floor(i * bandSize);
-            const endIdx = Math.max(startIdx + 1, Math.floor((i + 1) * bandSize));
-            const bandSlice = rimTiles.slice(startIdx, endIdx);
-            const pick = bandSlice[Math.floor(Math.random() * bandSlice.length)] || rimTiles[i % rimTiles.length];
-            chosen.push({ q: pick.q, r: pick.r, regionName: pick.region.name });
-        }
+        // Pick `count` evenly spaced anchorages from North to South so players don't crowd the same bay
+        const indexPatterns = {
+            1: [2],
+            2: [1, 3],
+            3: [0, 2, 4],
+            4: [0, 1, 3, 4],
+            5: [0, 1, 2, 3, 4]
+        };
+        const pattern = indexPatterns[Math.min(5, Math.max(1, count))] || [0, 1, 2, 3, 4];
 
+        const chosen = pattern.map(idx => {
+            const a = anchors[idx % anchors.length];
+            const tile = this.world.hexMap.get(`${a.q},${a.r}`) || a;
+            return {
+                q: tile.q,
+                r: tile.r,
+                regionName: tile.region ? tile.region.name : "Hải Phận Việt Nam"
+            };
+        });
+
+        // Randomly shuffle which player gets which balanced anchorage
         for (let i = chosen.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [chosen[i], chosen[j]] = [chosen[j], chosen[i]];
@@ -1681,6 +1902,30 @@ class GoldenJourneyGame {
                 price: 2
             }
         ];
+        this.tradeBulletinNotices = [
+            {
+                id: "init_1",
+                round: 1,
+                text: "⚓ 6 Thương Cảng đang thu mua Đặc sản xuyên vùng (Lãi 4–10 Xu + Key)!"
+            },
+            {
+                id: "init_2",
+                round: 1,
+                text: "📢 Sàn Chợ Liên Đội mở tự do mọi lượt (0 AP) — Đang có 3 lô hàng giá gốc 2 Xu."
+            }
+        ];
+    }
+
+    addTradeBulletinNotice(text) {
+        if (!this.tradeBulletinNotices) this.tradeBulletinNotices = [];
+        this.tradeBulletinNotices.unshift({
+            id: Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+            round: this.roundNumber || 1,
+            text
+        });
+        if (this.tradeBulletinNotices.length > 10) {
+            this.tradeBulletinNotices.length = 10;
+        }
     }
 
     getCargoCount(player) {
@@ -1790,7 +2035,20 @@ class GoldenJourneyGame {
                     bestDist.set(key, nextSteps);
                     const nextPath = [...cur.path, nextTile];
                     reachable.set(key, { steps: nextSteps, path: nextPath });
-                    queue.push({ q: nq, r: nr, steps: nextSteps, path: nextPath });
+
+                    // REALISTIC MARITIME NAVIGATION:
+                    // Ships can dock at a Monument, Trading Port, Resource Extraction Node, or Rare NPC tile
+                    // as their final destination, but CANNOT sail straight *through* them to reach another hex!
+                    // They must steer around any obstacle/POI tile via open sea lanes.
+                    const isDockOnlyPOI = Boolean(
+                        nextTile.monumentId ||
+                        nextTile.isPort ||
+                        nextTile.resourceType ||
+                        nextTile.hasNPC
+                    );
+                    if (!isDockOnlyPOI) {
+                        queue.push({ q: nq, r: nr, steps: nextSteps, path: nextPath });
+                    }
                 }
             }
         }
@@ -1889,7 +2147,7 @@ class GoldenJourneyGame {
     triggerContextualActionOnCurrentHex() {
         const p = this.getActivePlayer();
         if (!this.isMyTurn()) {
-            this.showToast(`👁️ Đang là lượt của ${p ? p.name : 'người chơi khác'}!`);
+            this.openMaritimeMarketModal();
             return;
         }
         const tile = this.getCurrentTile(p);
@@ -2079,6 +2337,8 @@ class GoldenJourneyGame {
 
     // ------------------------------------------------------------------------
     // IV & V. TRADE PORT & SHARED PLAYER-TO-PLAYER MARITIME MARKETPLACE
+    // - Port displays current Coin balance & Cargo clearly
+    // - Shared Market ("Chợ") can be used by ANY player on ANY turn with 0 AP cost!
     // ------------------------------------------------------------------------
     openTradePortModal(tile) {
         const p = this.getActivePlayer();
@@ -2098,21 +2358,21 @@ class GoldenJourneyGame {
             if (dist === 0) {
                 sellInfo = `
                     <button class="btn-trade-action" onclick="window.GAME.listSpecialtyOnPlayerMarket(${idx}, 3)">
-                        📢 Đăng Bán Lên Sàn Chợ Chung (Giá 3 Xu)
+                        📢 Đăng Bán Lên Sàn Chợ Chung (Giá 3 Xu • 0 AP)
                     </button>
                 `;
             } else if (dist === 1) {
                 sellInfo = `
                     <div style="display:flex; gap:6px; flex-wrap:wrap">
                         <button class="btn-trade-action" onclick="window.GAME.sellSpecialtyAtPort(${idx}, 4, false)">Bán Cho Cảng (Cách 1 vùng): +4 Xu (Lời 2 Xu)</button>
-                        <button class="btn-trade-action" onclick="window.GAME.listSpecialtyOnPlayerMarket(${idx}, 4)">Đăng Chợ Chung (4 Xu)</button>
+                        <button class="btn-trade-action" onclick="window.GAME.listSpecialtyOnPlayerMarket(${idx}, 4)">Đăng Chợ Chung (4 Xu • 0 AP)</button>
                     </div>
                 `;
             } else if (dist === 2) {
                 sellInfo = `
                     <div style="display:flex; gap:6px; flex-wrap:wrap">
                         <button class="btn-trade-action" onclick="window.GAME.sellSpecialtyAtPort(${idx}, 6, false)">Bán Cho Cảng (Cách 2 vùng): +6 Xu (Lời 4 Xu)</button>
-                        <button class="btn-trade-action" onclick="window.GAME.listSpecialtyOnPlayerMarket(${idx}, 5)">Đăng Chợ Chung (5 Xu)</button>
+                        <button class="btn-trade-action" onclick="window.GAME.listSpecialtyOnPlayerMarket(${idx}, 5)">Đăng Chợ Chung (5 Xu • 0 AP)</button>
                     </div>
                 `;
             } else {
@@ -2142,9 +2402,23 @@ class GoldenJourneyGame {
                 <span class="badge-tag">${region.name}</span>
             </div>
             <h2 class="modal-title">Trung Tâm Giao Thương Đặc Sản 6 Vùng &amp; Chợ Hàng Hải Liên Đội</h2>
+
+            <div class="port-wallet-bar">
+                <div class="wallet-coin-pill">
+                    🪙 Số Xu hiện có: <strong>${p.coins} / 10 Xu</strong>
+                </div>
+                <div class="wallet-cargo-pill">
+                    📦 Khoang tàu: <strong>${this.getCargoCount(p)} / 8 thẻ</strong>
+                    &nbsp;•&nbsp; 🌾 Lúa: <strong>${p.food}</strong>
+                    &nbsp;•&nbsp; 🌲 Gỗ: <strong>${p.wood}</strong>
+                    &nbsp;•&nbsp; ⛏️ Sắt: <strong>${p.iron}</strong>
+                    &nbsp;•&nbsp; 🗝️ Key 1/2/3: <strong>${p.keys[1] || 0}/${p.keys[2] || 0}/${p.keys[3] || 0}</strong>
+                </div>
+            </div>
+
             <p class="modal-desc">
                 <strong>Thế mạnh kinh tế vùng:</strong> ${region.strengths}<br/>
-                <em>(Mỗi lần giao dịch tại cảng tốn 1 AP Tương Tác. Bạn có thể mua đặc sản gốc, bán đặc sản xuyên vùng cho Cảng, hoặc mua/bán trực tiếp với các Người chơi khác trên Sàn Chợ Chung!)</em>
+                <em>(Giao dịch trực tiếp với Thương Cảng tốn 1 AP Tương Tác. Riêng mua/bán với người chơi khác trên <strong>Sàn Chợ Chung hoàn toàn MIỄN PHÍ 0 AP</strong> và giao dịch được ở mọi lượt!)</em>
             </p>
 
             <div class="port-grid-sections">
@@ -2172,11 +2446,11 @@ class GoldenJourneyGame {
                 </div>
 
                 <div class="port-box" style="border-color:#4f8699">
-                    <h3>3. 🤝 Sàn Giao Dịch Hàng Hải Chung (Người Chơi Đăng Bán &amp; Người Chơi Khác Mua Lại)</h3>
+                    <h3>3. 🤝 Sàn Giao Dịch Hàng Hải Chung (Mọi Lượt • Không Tốn AP)</h3>
                     <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px">
-                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('food', 2)">📢 Đăng bán 1 🌾 Lúa (Giá 2 Xu)</button>
-                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('wood', 2)">📢 Đăng bán 1 🌲 Gỗ (Giá 2 Xu)</button>
-                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('iron', 3)">📢 Đăng bán 1 ⛏️ Sắt (Giá 3 Xu)</button>
+                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('food', 2)">📢 Đăng bán 1 🌾 Lúa (2 Xu • 0 AP)</button>
+                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('wood', 2)">📢 Đăng bán 1 🌲 Gỗ (2 Xu • 0 AP)</button>
+                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('iron', 3)">📢 Đăng bán 1 ⛏️ Sắt (3 Xu • 0 AP)</button>
                     </div>
                     ${marketHtml}
                 </div>
@@ -2218,11 +2492,11 @@ class GoldenJourneyGame {
     }
 
     openMaritimeMarketModal() {
-        const p = this.getActivePlayer();
-        const canAct = this.isMyTurn();
+        const p = this.getLocalPlayer() || this.getActivePlayer();
+        if (!p) return;
         const marketHtml = this.renderSharedMarketListingsHtml(p, false);
 
-        const playerSpecHtml = (canAct ? p.specialties : []).map((item, idx) => {
+        const playerSpecHtml = (p.specialties || []).map((item, idx) => {
             const originReg = window.GAME_DATA.regions[item.regionId];
             return `
                 <div class="trade-row-card">
@@ -2231,56 +2505,67 @@ class GoldenJourneyGame {
                         <span style="font-size:12px; color:#94a3b8"> (Vùng gốc: ${originReg.name})</span>
                     </div>
                     <div style="display:flex; gap:6px">
-                        <button class="btn-trade-action" onclick="window.GAME.listSpecialtyOnPlayerMarket(${idx}, 3, true)">Đăng bán giá 3 Xu</button>
-                        <button class="btn-trade-action gold" onclick="window.GAME.listSpecialtyOnPlayerMarket(${idx}, 4, true)">Đăng bán giá 4 Xu</button>
+                        <button class="btn-trade-action" onclick="window.GAME.listSpecialtyOnPlayerMarket(${idx}, 3, true)">Đăng bán 3 Xu (0 AP)</button>
+                        <button class="btn-trade-action gold" onclick="window.GAME.listSpecialtyOnPlayerMarket(${idx}, 4, true)">Đăng bán 4 Xu (0 AP)</button>
                     </div>
                 </div>
             `;
-        }).join("") || `<div style="color:#94a3b8; font-style:italic">${canAct ? 'Bạn chưa có Đặc sản vùng nào trong khoang để đăng bán.' : 'Chỉ người chơi đang trong lượt mới có thể đăng bán hoặc mua hàng.'}</div>`;
+        }).join("") || `<div style="color:#94a3b8; font-style:italic">Thuyền của bạn (${p.name}) chưa có Đặc sản vùng nào trong khoang để đăng bán.</div>`;
 
         const html = `
             <div class="modal-header-badge" style="background:#2d687833; border-color:#5c9ead">
-                <span>⚖️ SÀN GIAO THƯƠNG HÀNG HẢI LIÊN ĐỘI &amp; BẢNG GIÁ KINH TẾ 6 VÙNG</span>
+                <span>⚖️ SÀN GIAO THƯƠNG HÀNG HẢI LIÊN ĐỘI (TỰ DO GIAO DỊCH MỌI LƯỢT • 0 AP)</span>
                 <span class="badge-tag">Người chơi Bán &amp; Mua trực tiếp</span>
             </div>
             <h2 class="modal-title">Chợ Giao Thương Giữa Các Hải Đội &amp; Đặc Sản Vùng Miền</h2>
+
+            <div class="port-wallet-bar">
+                <div class="wallet-coin-pill">
+                    🪙 Số Xu của ${p.name}: <strong>${p.coins} / 10 Xu</strong>
+                </div>
+                <div class="wallet-cargo-pill">
+                    📦 Khoang tàu: <strong>${this.getCargoCount(p)} / 8 thẻ</strong>
+                    &nbsp;•&nbsp; 🌾 Lúa: <strong>${p.food}</strong>
+                    &nbsp;•&nbsp; 🌲 Gỗ: <strong>${p.wood}</strong>
+                    &nbsp;•&nbsp; ⛏️ Sắt: <strong>${p.iron}</strong>
+                </div>
+            </div>
+
             <p class="modal-desc">
-                Tại đây, người chơi đang trong lượt có thể <strong>đăng bán Đặc sản vùng, Lương thực, Gỗ, Sắt</strong> lên Chợ chung và <strong>người chơi khác có thể mua lại</strong> để kịp vượt biển mở Di tích hoặc gom hàng buôn Xuyên Việt!
+                ✨ <strong>Giao dịch tự do mọi lượt &amp; Không tốn AP:</strong> Bất kỳ lúc nào (kể cả khi đang trong lượt của người chơi khác), bạn đều có thể <strong>đăng bán Đặc sản vùng, Lương thực, Gỗ, Sắt</strong> từ tàu của mình hoặc <strong>mua ngay hàng hóa</strong> của các thuyền trưởng khác mà không mất AP!
             </p>
 
             <div class="port-grid-sections">
-                ${canAct ? `
                 <div class="port-box" style="border-color:#c59b27">
-                    <h3>📦 Đăng Bán Hàng Từ Khoang Tàu Của ${p.name} Lên Chợ Chung</h3>
+                    <h3>📦 Đăng Bán Hàng Từ Khoang Tàu Của Bạn (${p.name}) Lên Chợ Chung — 0 AP</h3>
                     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px">
-                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('food', 2, true)">📢 Đăng bán 1 🌾 Lúa (2 Xu) [Có: ${p.food}]</button>
-                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('wood', 2, true)">📢 Đăng bán 1 🌲 Gỗ (2 Xu) [Có: ${p.wood}]</button>
-                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('iron', 3, true)">📢 Đăng bán 1 ⛏️ Sắt (3 Xu) [Có: ${p.iron}]</button>
+                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('food', 2, true)">📢 Đăng bán 1 🌾 Lúa (2 Xu • 0 AP) [Có: ${p.food}]</button>
+                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('wood', 2, true)">📢 Đăng bán 1 🌲 Gỗ (2 Xu • 0 AP) [Có: ${p.wood}]</button>
+                        <button class="btn-trade-action" onclick="window.GAME.listResourceOnPlayerMarket('iron', 3, true)">📢 Đăng bán 1 ⛏️ Sắt (3 Xu • 0 AP) [Có: ${p.iron}]</button>
                     </div>
                     ${playerSpecHtml}
                 </div>
-                ` : ''}
 
                 <div class="port-box" style="border-color:#5c9ead">
-                    <h3>🛒 Các Lô Hàng Đang Chào Bán Trên Sàn</h3>
+                    <h3>🛒 Các Lô Hàng Đang Chào Bán Trên Sàn (Mua Ngay Không Tốn AP)</h3>
                     ${marketHtml}
                 </div>
             </div>
 
             <div class="modal-actions">
-                <button class="btn-primary-gold" onclick="window.GAME.closeModal()">Đóng Sàn Giao Thương</button>
+                <button class="btn-primary-gold" onclick="window.GAME.closeModal(true)">Đóng Sàn Giao Thương</button>
             </div>
         `;
         this.showModal(html);
     }
 
-    renderSharedMarketListingsHtml(activePlayer, insidePortModal = false) {
+    renderSharedMarketListingsHtml(viewerPlayer, insidePortModal = false) {
+        const p = viewerPlayer || this.getLocalPlayer() || this.getActivePlayer();
         if (this.marketListings.length === 0) {
             return `<div style="color:#94a3b8; font-style:italic; padding:8px 0">Hiện chưa có lô hàng nào đang rao bán trên sàn.</div>`;
         }
-        const canAct = this.isMyTurn();
         return this.marketListings.map(listing => {
-            const isOwn = activePlayer && (listing.sellerId === activePlayer.id);
+            const isOwn = p && (listing.sellerId === p.id);
             const regionInfo = listing.itemType === "specialty"
                 ? ` • Xuất xứ: ${window.GAME_DATA.regions[listing.regionId].name}`
                 : "";
@@ -2289,15 +2574,13 @@ class GoldenJourneyGame {
                     <div>
                         <strong style="color:#e5c365">${listing.icon} ${listing.name}</strong>
                         <div style="font-size:12px; color:#cbd5e1">
-                            Người bán: <strong>${listing.sellerName}</strong>${regionInfo} • Giá: <strong style="color:#68b684">${listing.price} Xu</strong>
+                            Người bán: <strong>${listing.sellerName}</strong>${regionInfo} • Giá: <strong style="color:#68b684">${listing.price} Xu</strong> <span style="font-size:10.5px; color:#9be2b6">(0 AP)</span>
                         </div>
                     </div>
                     <div>
-                        ${!canAct
-                            ? `<span style="font-size:11.5px; color:#94a3b8">Chờ tới lượt để giao dịch</span>`
-                            : (isOwn
-                                ? `<button class="btn-trade-action" style="background:#475569" onclick="window.GAME.cancelMarketListing(${listing.id}, ${insidePortModal})">Thu hồi về tàu</button>`
-                                : `<button class="btn-trade-action gold" onclick="window.GAME.buyMarketListing(${listing.id}, ${insidePortModal})">🛒 Mua Ngay (${listing.price} Xu)</button>`)
+                        ${isOwn
+                            ? `<button class="btn-trade-action" style="background:#475569" onclick="window.GAME.cancelMarketListing(${listing.id}, ${insidePortModal})">Thu hồi về tàu (0 AP)</button>`
+                            : `<button class="btn-trade-action gold" onclick="window.GAME.buyMarketListing(${listing.id}, ${insidePortModal})">🛒 Mua Ngay (${listing.price} Xu • 0 AP)</button>`
                         }
                     </div>
                 </div>
@@ -2305,17 +2588,46 @@ class GoldenJourneyGame {
         }).join("");
     }
 
+    async syncMarketTransaction() {
+        if (!this.roomState.code) return;
+        const snapshot = this.serializeGameState();
+        this.saveRoomToLocalStorage(snapshot);
+        try {
+            const resp = await fetch("/api/room/market-tx", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    code: this.roomState.code,
+                    players: this.players,
+                    updatedPlayers: this.players,
+                    marketListings: this.marketListings,
+                    tradeBulletinNotices: this.tradeBulletinNotices
+                })
+            });
+            const data = await resp.json();
+            if (data && data.version) {
+                this.roomState.version = data.version;
+            }
+        } catch (e) {}
+        this.broadcastRoomMessage({
+            type: "ROOM_STATE_SYNC",
+            code: this.roomState.code,
+            version: this.roomState.version,
+            gameState: snapshot
+        });
+    }
+
     listSpecialtyOnPlayerMarket(specIdx, price, fromMarketModal = false) {
-        if (!this.isMyTurn()) return;
-        const p = this.getActivePlayer();
+        const p = this.getLocalPlayer() || this.getActivePlayer();
+        if (!p) return;
         const item = p.specialties[specIdx];
         if (!item) return;
 
-        if (!fromMarketModal && this.currentPortTile) this.ensurePortApDeducted();
+        // Listing on the Shared Market costs 0 AP and can be done on ANY turn!
         p.specialties.splice(specIdx, 1);
 
         this.marketListings.unshift({
-            id: this.nextListingId++,
+            id: Date.now() + Math.floor(Math.random() * 1000),
             sellerId: p.id,
             sellerName: p.name,
             itemType: "specialty",
@@ -2326,21 +2638,22 @@ class GoldenJourneyGame {
         });
 
         window.SFX.playClick();
-        this.logEvent(`📢 ${p.name} đã đăng bán đặc sản [${item.icon} ${item.name}] lên Sàn Giao Thương với giá ${price} Xu!`);
+        this.logEvent(`📢 ${p.name} đã đăng bán đặc sản [${item.icon} ${item.name}] lên Sàn Giao Thương với giá ${price} Xu (0 AP)!`);
+        this.addTradeBulletinNotice(`📢 ${p.name} rao bán [${item.icon} ${item.name}] giá ${price} Xu`);
         this.updateUI();
-        this.syncMultiplayerGameState();
-        if (fromMarketModal) this.openMaritimeMarketModal();
+        this.syncMarketTransaction();
+        if (fromMarketModal || !this.isMyTurn()) this.openMaritimeMarketModal();
         else if (this.currentPortTile) this.openTradePortModal(this.currentPortTile);
     }
 
     listResourceOnPlayerMarket(resType, price, fromMarketModal = false) {
-        if (!this.isMyTurn()) return;
-        const p = this.getActivePlayer();
+        const p = this.getLocalPlayer() || this.getActivePlayer();
+        if (!p) return;
         if (p[resType] < 1) {
             this.showToast("Bạn không có sẵn tài nguyên này trong khoang để đăng bán!");
             return;
         }
-        if (!fromMarketModal && this.currentPortTile) this.ensurePortApDeducted();
+        // Listing on the Shared Market costs 0 AP and can be done on ANY turn!
         p[resType] -= 1;
 
         const meta = {
@@ -2350,7 +2663,7 @@ class GoldenJourneyGame {
         }[resType];
 
         this.marketListings.unshift({
-            id: this.nextListingId++,
+            id: Date.now() + Math.floor(Math.random() * 1000),
             sellerId: p.id,
             sellerName: p.name,
             itemType: "resource",
@@ -2361,16 +2674,17 @@ class GoldenJourneyGame {
         });
 
         window.SFX.playClick();
-        this.logEvent(`📢 ${p.name} đăng bán [1 ${meta.icon} ${meta.name}] lên Sàn Giao Thương với giá ${price} Xu.`);
+        this.logEvent(`📢 ${p.name} đăng bán [1 ${meta.icon} ${meta.name}] lên Sàn Giao Thương với giá ${price} Xu (0 AP).`);
+        this.addTradeBulletinNotice(`📢 ${p.name} rao bán [1 ${meta.icon} ${meta.name}] giá ${price} Xu`);
         this.updateUI();
-        this.syncMultiplayerGameState();
-        if (fromMarketModal) this.openMaritimeMarketModal();
+        this.syncMarketTransaction();
+        if (fromMarketModal || !this.isMyTurn()) this.openMaritimeMarketModal();
         else if (this.currentPortTile) this.openTradePortModal(this.currentPortTile);
     }
 
-    buyMarketListing(listingId, insidePortModal = false) {
-        if (!this.isMyTurn()) return;
-        const buyer = this.getActivePlayer();
+    buyMarketListing(listingId, insidePortModal = false, fromHudBulletin = false) {
+        const buyer = this.getLocalPlayer() || this.getActivePlayer();
+        if (!buyer) return;
         const idx = this.marketListings.findIndex(l => l.id === listingId);
         if (idx === -1) return;
         const listing = this.marketListings[idx];
@@ -2384,20 +2698,19 @@ class GoldenJourneyGame {
             return;
         }
 
-        if (insidePortModal && this.currentPortTile) {
-            this.ensurePortApDeducted();
-        }
-
+        // Buying on the Shared Market costs 0 AP and works on ANY turn!
         buyer.coins -= listing.price;
 
         if (listing.sellerId >= 0) {
             const seller = this.players.find(pl => pl.id === listing.sellerId);
             if (seller) {
                 seller.coins = Math.min(10, seller.coins + listing.price);
-                this.logEvent(`🤝 Giao dịch thành công! ${buyer.name} đã mua [${listing.icon} ${listing.name}] từ ${seller.name} với giá ${listing.price} Xu!`);
+                this.logEvent(`🤝 Giao dịch thành công (0 AP)! ${buyer.name} đã mua [${listing.icon} ${listing.name}] từ ${seller.name} với giá ${listing.price} Xu!`);
+                this.addTradeBulletinNotice(`🤝 ${buyer.name} mua [${listing.icon} ${listing.name}] từ ${seller.name} (${listing.price} Xu)`);
             }
         } else {
-            this.logEvent(`🛒 ${buyer.name} đã mua [${listing.icon} ${listing.name}] từ ${listing.sellerName} với giá ${listing.price} Xu.`);
+            this.logEvent(`🛒 ${buyer.name} đã mua [${listing.icon} ${listing.name}] từ ${listing.sellerName} với giá ${listing.price} Xu (0 AP).`);
+            this.addTradeBulletinNotice(`🛒 ${buyer.name} mua [${listing.icon} ${listing.name}] từ ${listing.sellerName} (${listing.price} Xu)`);
         }
 
         if (listing.itemType === "specialty") {
@@ -2412,16 +2725,19 @@ class GoldenJourneyGame {
 
         this.marketListings.splice(idx, 1);
         window.SFX.playCoin();
+        this.showToast(`🛒 Đã mua [${listing.icon} ${listing.name}] (-${listing.price} Xu • 0 AP)!`);
         this.updateUI();
-        this.syncMultiplayerGameState();
+        this.syncMarketTransaction();
 
-        if (insidePortModal && this.currentPortTile) this.openTradePortModal(this.currentPortTile);
-        else this.openMaritimeMarketModal();
+        if (!fromHudBulletin) {
+            if (insidePortModal && this.currentPortTile && this.isMyTurn()) this.openTradePortModal(this.currentPortTile);
+            else this.openMaritimeMarketModal();
+        }
     }
 
-    cancelMarketListing(listingId, insidePortModal = false) {
-        if (!this.isMyTurn()) return;
-        const p = this.getActivePlayer();
+    cancelMarketListing(listingId, insidePortModal = false, fromHudBulletin = false) {
+        const p = this.getLocalPlayer() || this.getActivePlayer();
+        if (!p) return;
         const idx = this.marketListings.findIndex(l => l.id === listingId);
         if (idx === -1) return;
         const listing = this.marketListings[idx];
@@ -2439,10 +2755,13 @@ class GoldenJourneyGame {
         }
 
         this.marketListings.splice(idx, 1);
+        this.addTradeBulletinNotice(`↩️ ${p.name} thu hồi [${listing.icon} ${listing.name}] về tàu`);
         this.updateUI();
-        this.syncMultiplayerGameState();
-        if (insidePortModal && this.currentPortTile) this.openTradePortModal(this.currentPortTile);
-        else this.openMaritimeMarketModal();
+        this.syncMarketTransaction();
+        if (!fromHudBulletin) {
+            if (insidePortModal && this.currentPortTile && this.isMyTurn()) this.openTradePortModal(this.currentPortTile);
+            else this.openMaritimeMarketModal();
+        }
     }
 
     ensurePortApDeducted() {
@@ -2474,6 +2793,7 @@ class GoldenJourneyGame {
         });
         window.SFX.playCoin();
         this.logEvent(`📦 ${p.name} mua đặc sản [${reg.specialty.icon} ${reg.specialty.shortName}] tại ${reg.name} với giá 2 Xu.`);
+        this.addTradeBulletinNotice(`📦 ${p.name} nhập [${reg.specialty.icon} ${reg.specialty.shortName}] tại ${reg.name} (2 Xu)`);
         this.updateUI();
         this.syncMultiplayerGameState();
         this.openTradePortModal(this.currentPortTile);
@@ -2499,6 +2819,7 @@ class GoldenJourneyGame {
         window.SFX.playCoin();
         this.world.triggerBurstAnimation(p.q, p.r, 0xd4af37, 22);
         this.logEvent(`💰 ${p.name} bán thương phẩm [${item.icon} ${item.name}] thu về ${coinPrice} Xu${keyMsg}!`);
+        this.addTradeBulletinNotice(`💰 ${p.name} bán [${item.icon} ${item.name}] thu +${coinPrice} Xu${keyMsg}`);
         this.updateUI();
         this.syncMultiplayerGameState();
         this.openTradePortModal(this.currentPortTile);
@@ -2843,6 +3164,7 @@ class GoldenJourneyGame {
             this.logEvent(`👑 CHIẾN CÔNG LỊCH SỬ! ${p.name} đã chinh phục [${mon.name} - Cấp ${tier}], thu thập Bảo Vật [${mon.relicIcon} ${mon.relicName}] (${p.relics.length}/3) và +${tierMeta.rewardCoins} Xu!`);
 
             if (p.relics.length >= 3) {
+                this.matchWinner = p;
                 this.updateUI();
                 this.syncMultiplayerGameState();
                 this.showVictoryScreen(p, quiz, chosenIdx);
@@ -2940,6 +3262,8 @@ class GoldenJourneyGame {
         }
 
         if (p.relics.length >= 3) {
+            this.matchWinner = p;
+            this.syncMultiplayerGameState();
             this.showVictoryScreen(p);
             return;
         }
@@ -3095,6 +3419,8 @@ class GoldenJourneyGame {
                 this.logEvent(`🤖 [AI] ${ai.name} đã giải đố thành công tại [${mon.name}] và nhận Bảo Vật [${mon.relicIcon} ${mon.relicName}] (${ai.relics.length}/3)!`);
 
                 if (ai.relics.length >= 3) {
+                    this.matchWinner = ai;
+                    this.syncMultiplayerGameState();
                     this.showVictoryScreen(ai);
                 }
                 return;
@@ -3114,6 +3440,7 @@ class GoldenJourneyGame {
                         ai.keys[1] += 1;
                     }
                     this.logEvent(`🤖 [AI] ${ai.name} bán đặc sản [${sp.icon} ${sp.name}] tại ${tile.portName} thu về +${gain} Xu!`);
+                    this.addTradeBulletinNotice(`💰 ${ai.name} bán [${sp.icon} ${sp.name}] tại ${tile.portName} (+${gain} Xu)`);
                 }
             }
 
@@ -3144,9 +3471,11 @@ class GoldenJourneyGame {
                         price: 3
                     });
                     this.logEvent(`📢 [AI] ${ai.name} vừa đăng bán đặc sản [${specItem.icon} ${specItem.name}] lên Sàn Giao Thương Chung (Giá 3 Xu)!`);
+                    this.addTradeBulletinNotice(`📢 ${ai.name} rao bán [${specItem.icon} ${specItem.name}] giá 3 Xu`);
                 } else {
                     ai.specialties.push(specItem);
                     this.logEvent(`🤖 [AI] ${ai.name} mua đặc sản [${specItem.icon} ${specItem.name}] tại ${tile.portName}.`);
+                    this.addTradeBulletinNotice(`📦 ${ai.name} nhập [${specItem.icon} ${specItem.name}] tại ${tile.portName}`);
                 }
             }
             return;
@@ -3175,22 +3504,51 @@ class GoldenJourneyGame {
     }
 
     // ------------------------------------------------------------------------
-    // VICTORY SCREEN (3 ROYAL RELICS COLLECTED)
+    // VICTORY SCREEN (3 ROYAL RELICS COLLECTED + 15-SECOND AUTO RETURN TO ROOM)
     // ------------------------------------------------------------------------
     showVictoryScreen(winner, lastQuiz = null, lastChosenIdx = null) {
+        if (!winner) return;
+        this.victoryShownForMatch = true;
+        this.matchWinner = winner;
+        clearTimeout(this.autoEndTurnTimer);
+        clearInterval(this.victoryCountdownInterval);
+
         window.SFX.playRelicFanfare();
+
+        const sortedStandings = [...this.players].sort((a, b) => {
+            const relDiff = (b.relics ? b.relics.length : 0) - (a.relics ? a.relics.length : 0);
+            if (relDiff !== 0) return relDiff;
+            return (b.coins || 0) - (a.coins || 0);
+        });
+
+        const standingsHtml = sortedStandings.map((pl, idx) => `
+            <div class="turn-order-leaderboard-row ${pl.id === winner.id ? 'rank-1' : ''}">
+                <div style="display:flex; align-items:center; gap:10px">
+                    <span class="slot-badge-num" style="background:${pl.color}; width:26px; height:26px; font-size:12px">#${idx + 1}</span>
+                    <div>
+                        <strong style="color:#e8eef4; font-size:13.5px">${pl.name} (${pl.vesselTitle})</strong>
+                        ${pl.id === winner.id ? '<span style="color:#ffd54f; font-weight:800; margin-left:6px">🏆 NHÀ VÔ ĐỊCH</span>' : ''}
+                    </div>
+                </div>
+                <div style="font-size:12.5px; font-weight:800; color:#e5c365">
+                    👑 ${(pl.relics || []).length}/3 Bảo Vật • 🪙 ${pl.coins} Xu
+                </div>
+            </div>
+        `).join("");
+
         const html = `
             <div class="modal-header-badge" style="background:#c59b2733; border-color:#c59b27">
-                <span>🏆 CHIẾN THẮNG TUYỆT ĐỐI – THE GOLDEN JOURNEY (HÀNH TRÌNH VÀNG SON)</span>
+                <span>🏆 MÀN HÌNH CHÚC MỪNG CHIẾN THẮNG – THE GOLDEN JOURNEY (HÀNH TRÌNH VÀNG SON)</span>
+                <span class="badge-tag">Kết Thúc Ván Đấu</span>
             </div>
-            <h2 class="modal-title" style="font-size:26px; color:#e5c365">
-                👑 ${winner.name} (${winner.vesselTitle}) Đăng Quang!
+            <h2 class="modal-title" style="font-size:24px; color:#ffd54f; text-align:center">
+                🎉👑 CHÚC MỪNG ${winner.name.toUpperCase()} (${winner.vesselTitle}) GIÀNH CHIẾN THẮNG! 👑🎉
             </h2>
-            <p class="modal-desc">
-                Chúc mừng <strong>${winner.name}</strong> đã xuất sắc vượt qua sóng gió Biển Đông, giao thương đặc sản qua <strong>6 Vùng Kinh Tế Việt Nam</strong> và thu thập trọn bộ <strong>3 BẢO VẬT HOÀNG GIA (ROYAL RELICS)</strong>!
+            <p class="modal-desc" style="text-align:center">
+                Thuyền trưởng <strong>${winner.name}</strong> đã xuất sắc vượt qua sóng gió Biển Đông, giao thương đặc sản dọc <strong>Bản Đồ Hình Chữ S 6 Vùng Kinh Tế Việt Nam</strong> và chinh phục trọn bộ <strong>3 BẢO VẬT HOÀNG GIA (ROYAL RELICS)</strong>!
             </p>
             <div class="relic-showcase-row">
-                ${winner.relics.map(r => `
+                ${(winner.relics || []).map(r => `
                     <div class="relic-victory-card">
                         <div style="font-size:36px">${r.icon}</div>
                         <div style="font-weight:700; color:#e5c365; margin-top:6px">${r.name}</div>
@@ -3198,25 +3556,78 @@ class GoldenJourneyGame {
                     </div>
                 `).join("")}
             </div>
-            ${lastQuiz !== null ? this.renderQuizVisualMemoryCard(lastQuiz, lastChosenIdx) : ''}
-            <div class="modal-actions">
-                <button class="btn-primary-gold" onclick="window.GAME.closeModal(); window.GAME.showWaitingScreen()">
-                    🚪 Quay Về Màn Hình Chờ / Tạo Ván Mới
+
+            <div class="turn-order-leaderboard" style="margin:10px 0">
+                ${standingsHtml}
+            </div>
+
+            ${lastQuiz !== null ? this.renderQuizVisualMemoryCard(lastQuiz, lastChosenIdx, winner.name) : ''}
+
+            <div class="victory-countdown-box">
+                <div>⏳ Ván đấu sẽ tự động đóng và đưa toàn bộ người chơi về lại <strong>Phòng Chờ Ban Đầu</strong> sau:</div>
+                <div id="victory-countdown-sec" class="victory-countdown-sec">15s</div>
+            </div>
+
+            <div class="modal-actions" style="justify-content:center">
+                <button class="btn-primary-gold" onclick="window.GAME.returnToRoomLobbyAfterVictory()">
+                    🚪 Quay Về Phòng Ban Đầu Ngay
                 </button>
             </div>
         `;
         this.showModal(html);
+
+        let secLeft = 15;
+        this.victoryCountdownInterval = setInterval(() => {
+            secLeft -= 1;
+            const secEl = document.getElementById("victory-countdown-sec");
+            if (secEl) secEl.textContent = `${Math.max(0, secLeft)}s`;
+            if (secLeft <= 0) {
+                clearInterval(this.victoryCountdownInterval);
+                this.returnToRoomLobbyAfterVictory();
+            }
+        }, 1000);
+    }
+
+    async returnToRoomLobbyAfterVictory() {
+        clearInterval(this.victoryCountdownInterval);
+        clearTimeout(this.autoEndTurnTimer);
+        this.matchWinner = null;
+        this.liveQuizState = null;
+
+        if (this.roomState.code) {
+            try {
+                const resp = await fetch("/api/room/return-to-lobby", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ code: this.roomState.code })
+                });
+                const data = await resp.json();
+                if (data && data.room) {
+                    this.roomState.status = "waiting";
+                    this.roomState.seats = data.room.seats || this.roomState.seats;
+                    this.roomState.version = data.room.version || (this.roomState.version + 1);
+                }
+            } catch (e) {
+                this.roomState.status = "waiting";
+            }
+        } else {
+            this.roomState.status = "waiting";
+        }
+
+        document.getElementById("modal-overlay").classList.add("hidden");
+        this.showWaitingScreen();
+        this.showToast("🏁 Ván đấu đã khép lại! Đã đưa bạn về lại Phòng chờ ban đầu.");
     }
 
     // ------------------------------------------------------------------------
-    // UI UPDATES, TOOLTIPS, ATLAS & RULEBOOK MODALS
+    // UI UPDATES (ALWAYS DISPLAY LOCAL PLAYER'S OWN STATS IN #panel-captain)
     // ------------------------------------------------------------------------
     updateUI() {
         const p = this.getActivePlayer();
         if (!p) return;
         const localP = this.getLocalPlayer() || p;
         const myTurn = this.isMyTurn();
-        const tile = this.getCurrentTile(p);
+        const activeTile = this.getCurrentTile(p);
 
         document.getElementById("hud-round").textContent = `Vòng ${this.roundNumber}`;
 
@@ -3237,37 +3648,59 @@ class GoldenJourneyGame {
             }
         }
 
-        document.getElementById("active-player-dot").style.backgroundColor = p.color;
-        document.getElementById("active-player-name").textContent = `${p.name} ${p.isAI ? '(Bot AI)' : (myTurn ? '(Lượt của bạn)' : '(Đang đi lượt)')}`;
-        document.getElementById("active-player-vessel").textContent = p.vesselTitle;
+        this.updateSpectatorQuizPillUI();
 
-        const moveApRemaining = Math.max(0, Math.min(3 - (p.moveApSpent || 0), p.ap));
-        document.getElementById("stat-ap").textContent = `${p.ap} / 4 AP`;
-        document.getElementById("stat-move-steps").textContent = `Đi tối đa: ${this.getRemainingHexSteps(p)} ô (${moveApRemaining}/3 AP)`;
-        document.getElementById("stat-hp").textContent = `${p.hp} / ${p.maxHp} ❤️`;
-        document.getElementById("stat-coins").textContent = `${p.coins} / 10 🪙`;
-        document.getElementById("stat-cargo").textContent = `Khoang: ${this.getCargoCount(p)}/8`;
-        document.getElementById("stat-relics").textContent = `${p.relics.length} / 3 👑`;
+        // Compact banner inside #panel-captain showing who is currently taking their turn when spectating
+        const specBannerEl = document.getElementById("spectator-active-turn-banner");
+        if (specBannerEl) {
+            if (!myTurn) {
+                specBannerEl.classList.remove("hidden");
+                specBannerEl.innerHTML = `
+                    <span>👁️ Lượt hiện tại: <strong>${p.name}</strong></span>
+                    <span class="turn-ap-tag">⚡ ${p.ap}/4 AP • ❤️ ${p.hp} HP • 🪙 ${p.coins} Xu</span>
+                `;
+            } else {
+                specBannerEl.classList.add("hidden");
+            }
+        }
 
-        document.getElementById("inv-food").textContent = p.food;
-        document.getElementById("inv-wood").textContent = p.wood;
-        document.getElementById("inv-iron").textContent = p.iron;
-        document.getElementById("inv-k1").textContent = p.keys[1] || 0;
-        document.getElementById("inv-k2").textContent = p.keys[2] || 0;
-        document.getElementById("inv-k3").textContent = p.keys[3] || 0;
+        // IMPORTANT: #panel-captain ALWAYS displays the LOCAL player's own ship info (`localP`)
+        // so you can inspect your own Coins, AP, Resources, Keys, Specialties, and Relics during anyone's turn!
+        document.getElementById("active-player-dot").style.backgroundColor = localP.color;
+        document.getElementById("active-player-name").textContent = `${localP.name} ${myTurn ? '(Đang đi lượt 🎯)' : '(Thuyền của bạn ⛵)'}`;
+        document.getElementById("active-player-vessel").textContent = localP.vesselTitle;
+
+        const moveApRemaining = myTurn
+            ? Math.max(0, Math.min(3 - (localP.moveApSpent || 0), localP.ap))
+            : 3;
+        document.getElementById("stat-ap").textContent = myTurn ? `${localP.ap} / 4 AP` : `Chờ lượt (4 AP)`;
+        document.getElementById("stat-move-steps").textContent = myTurn
+            ? `Đi tối đa: ${this.getRemainingHexSteps(localP)} ô (${moveApRemaining}/3 AP)`
+            : `Đang lượt của ${p.name}`;
+        document.getElementById("stat-hp").textContent = `${localP.hp} / ${localP.maxHp} ❤️`;
+        document.getElementById("stat-coins").textContent = `${localP.coins} / 10 🪙`;
+        document.getElementById("stat-cargo").textContent = `Khoang: ${this.getCargoCount(localP)}/8`;
+        document.getElementById("stat-relics").textContent = `${localP.relics.length} / 3 👑`;
+
+        document.getElementById("inv-food").textContent = localP.food;
+        document.getElementById("inv-wood").textContent = localP.wood;
+        document.getElementById("inv-iron").textContent = localP.iron;
+        document.getElementById("inv-k1").textContent = localP.keys[1] || 0;
+        document.getElementById("inv-k2").textContent = localP.keys[2] || 0;
+        document.getElementById("inv-k3").textContent = localP.keys[3] || 0;
 
         const specContainer = document.getElementById("inv-specialties");
-        if (p.specialties.length === 0) {
+        if (localP.specialties.length === 0) {
             specContainer.innerHTML = `<span class="empty-tag">Chưa có đặc sản (Mua tại Cảng giá 2 Xu)</span>`;
         } else {
-            specContainer.innerHTML = p.specialties.map(s => `<span class="spec-badge">${s.icon} ${s.name}</span>`).join("");
+            specContainer.innerHTML = localP.specialties.map(s => `<span class="spec-badge">${s.icon} ${s.name}</span>`).join("");
         }
 
         const relicContainer = document.getElementById("inv-relics-list");
-        if (p.relics.length === 0) {
+        if (localP.relics.length === 0) {
             relicContainer.innerHTML = `<span class="empty-tag">Chưa có Bảo Vật (Đạt 3 Bảo Vật để thắng)</span>`;
         } else {
-            relicContainer.innerHTML = p.relics.map(r => `<span class="relic-badge">${r.icon} ${r.name}</span>`).join("");
+            relicContainer.innerHTML = localP.relics.map(r => `<span class="relic-badge">${r.icon} ${r.name}</span>`).join("");
         }
 
         const ctxBtn = document.getElementById("btn-context-action");
@@ -3275,35 +3708,35 @@ class GoldenJourneyGame {
         const endTurnBtn = document.getElementById("btn-end-turn");
 
         if (!myTurn) {
-            ctxBtn.innerHTML = `👁️ Đang Xem Lượt Của ${p.name} (Góc Nhìn Tự Do)`;
-            ctxBtn.disabled = true;
+            ctxBtn.innerHTML = `⚖️ Mở Chợ Liên Đội Tự Do (0 AP) • Đang lượt ${p.name}`;
+            ctxBtn.disabled = false;
             ctxBtn.className = "btn-action primary-action";
             if (repairBtn) repairBtn.disabled = true;
             if (endTurnBtn) endTurnBtn.disabled = true;
         } else {
             if (repairBtn) repairBtn.disabled = false;
             if (endTurnBtn) endTurnBtn.disabled = false;
-            if (tile) {
-                if (tile.monumentId) {
-                    const mon = window.GAME_DATA.monuments.find(m => m.id === tile.monumentId);
+            if (activeTile) {
+                if (activeTile.monumentId) {
+                    const mon = window.GAME_DATA.monuments.find(m => m.id === activeTile.monumentId);
                     ctxBtn.innerHTML = `🏛️ Khám Phá Di Tích: ${mon.name} (1 AP)`;
                     ctxBtn.disabled = false;
                     ctxBtn.className = "btn-action primary-action";
-                } else if (tile.isPort) {
-                    ctxBtn.innerHTML = `⚓ Giao Thương Tại ${tile.portName} (1 AP)`;
+                } else if (activeTile.isPort) {
+                    ctxBtn.innerHTML = `⚓ Giao Thương Tại ${activeTile.portName} (1 AP)`;
                     ctxBtn.disabled = false;
                     ctxBtn.className = "btn-action primary-action";
-                } else if (tile.resourceType) {
-                    const cdText = tile.resourceCooldown > 0 ? ` (Hồi: ${tile.resourceCooldown} vòng)` : ` (1 AP)`;
+                } else if (activeTile.resourceType) {
+                    const cdText = activeTile.resourceCooldown > 0 ? ` (Hồi: ${activeTile.resourceCooldown} vòng)` : ` (1 AP)`;
                     ctxBtn.innerHTML = `⛏️ Khai Thác Tài Nguyên &amp; Đố Vui${cdText}`;
-                    ctxBtn.disabled = tile.resourceCooldown > 0 || !this.canSpendInteractiveAP(p);
+                    ctxBtn.disabled = activeTile.resourceCooldown > 0 || !this.canSpendInteractiveAP(p);
                     ctxBtn.className = "btn-action primary-action";
-                } else if (tile.hasNPC) {
+                } else if (activeTile.hasNPC) {
                     ctxBtn.innerHTML = `🧙‍♂️ Gặp Tiên Ông Rìu Vàng Rìu Bạc (1 AP)`;
                     ctxBtn.disabled = !this.canSpendInteractiveAP(p);
                     ctxBtn.className = "btn-action primary-action";
                 } else {
-                    ctxBtn.innerHTML = `⚖️ Mở Sàn Giao Thương Hàng Hải (${this.marketListings.length} lô)`;
+                    ctxBtn.innerHTML = `⚖️ Mở Sàn Giao Thương Hàng Hải (${this.marketListings.length} lô • 0 AP)`;
                     ctxBtn.disabled = false;
                     ctxBtn.className = "btn-action primary-action";
                 }
@@ -3312,6 +3745,44 @@ class GoldenJourneyGame {
 
         const marketBadgeEl = document.getElementById("market-count-badge");
         if (marketBadgeEl) marketBadgeEl.textContent = this.marketListings.length;
+
+        // Render Live Trade Bulletin Board (#panel-trade-bulletin)
+        const bulletinBadgeEl = document.getElementById("bulletin-count-badge");
+        if (bulletinBadgeEl) bulletinBadgeEl.textContent = this.marketListings.length;
+
+        const bulletinListingsEl = document.getElementById("trade-bulletin-listings");
+        if (bulletinListingsEl) {
+            if (!this.marketListings || this.marketListings.length === 0) {
+                bulletinListingsEl.innerHTML = `<div class="bulletin-empty">Chưa có lô hàng nào trên sàn. Nhấn <strong>+ Chợ</strong> để rao bán (0 AP)!</div>`;
+            } else {
+                bulletinListingsEl.innerHTML = this.marketListings.map(item => {
+                    const isOwn = localP && (item.sellerId === localP.id);
+                    const regShort = item.itemType === "specialty" && window.GAME_DATA.regions[item.regionId]
+                        ? ` • Vùng ${item.regionId + 1}`
+                        : "";
+                    return `
+                        <div class="bulletin-item-row">
+                            <div class="bulletin-item-info">
+                                <div class="bulletin-item-title" title="${item.name}">${item.icon} ${item.name}</div>
+                                <div class="bulletin-item-sub">${item.sellerName}${regShort} • <strong style="color:#6ee7b7">${item.price} 🪙</strong></div>
+                            </div>
+                            ${isOwn
+                                ? `<button class="bulletin-buy-btn own-item" onclick="window.GAME.cancelMarketListing(${item.id}, false, true)" title="Thu hồi về tàu (0 AP)">Hồi</button>`
+                                : `<button class="bulletin-buy-btn" onclick="window.GAME.buyMarketListing(${item.id}, false, true)" title="Mua ngay không tốn AP (${item.price} Xu)">Mua ${item.price}🪙</button>`
+                            }
+                        </div>
+                    `;
+                }).join("");
+            }
+        }
+
+        const bulletinNewsEl = document.getElementById("trade-bulletin-news");
+        if (bulletinNewsEl) {
+            const notices = (this.tradeBulletinNotices || []).slice(0, 4);
+            bulletinNewsEl.innerHTML = notices.map(n => `
+                <div class="bulletin-news-item"><strong style="color:#38bdf8">[V${n.round || 1}]</strong> ${n.text}</div>
+            `).join("");
+        }
 
         const rosterEl = document.getElementById("fleet-roster");
         rosterEl.innerHTML = this.players.map((pl, idx) => {
@@ -3532,12 +4003,25 @@ class GoldenJourneyGame {
         const overlay = document.getElementById("modal-overlay");
         const content = document.getElementById("modal-content");
         content.innerHTML = innerHTML;
+        content.style.transform = "translate(0px, 0px)";
+        content.dataset.dragX = "0";
+        content.dataset.dragY = "0";
         overlay.classList.remove("hidden");
+
+        // Make the modal header badge draggable so players can move any modal window out of the way!
+        const headerBadge = content.querySelector(".modal-header-badge") || content.querySelector(".spectator-quiz-banner");
+        if (headerBadge) {
+            headerBadge.style.cursor = "grab";
+            headerBadge.title = "Giữ chuột trái để kéo di chuyển cửa sổ này sang vị trí khác";
+            headerBadge.dataset.dragTarget = "modal-content";
+            headerBadge.classList.add("draggable-handle");
+        }
     }
 
     closeModal(fromSpectatorSync = false) {
         document.getElementById("modal-overlay").classList.add("hidden");
-        // If active player closes their quiz modal, clear liveQuizState so spectators' modals close too
+        this.updateSpectatorQuizPillUI();
+        // If active player closes their quiz modal, clear liveQuizState on server
         if (!fromSpectatorSync && this.isMyTurn() && this.liveQuizState) {
             this.liveQuizState = null;
             this.syncMultiplayerGameState();
@@ -3565,7 +4049,59 @@ class GoldenJourneyGame {
         this.toastTimer = setTimeout(() => toast.classList.add("hidden"), 4000);
     }
 
+    initDraggableWindows() {
+        let activeTarget = null;
+        let startPointerX = 0;
+        let startPointerY = 0;
+        let initialOffsetX = 0;
+        let initialOffsetY = 0;
+
+        window.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            // Ignore clicks on buttons or inputs inside the header
+            if (e.target.closest("button") || e.target.closest("input") || e.target.closest("select")) return;
+
+            const handle = e.target.closest(".draggable-handle");
+            if (!handle) return;
+
+            const targetId = handle.dataset.dragTarget;
+            const targetEl = targetId ? document.getElementById(targetId) : handle.closest(".glass-panel");
+            if (!targetEl) return;
+
+            activeTarget = targetEl;
+            startPointerX = e.clientX;
+            startPointerY = e.clientY;
+            initialOffsetX = parseFloat(targetEl.dataset.dragX || "0") || 0;
+            initialOffsetY = parseFloat(targetEl.dataset.dragY || "0") || 0;
+            handle.style.cursor = "grabbing";
+            e.preventDefault();
+        });
+
+        window.addEventListener("pointermove", (e) => {
+            if (!activeTarget) return;
+            const dx = e.clientX - startPointerX;
+            const dy = e.clientY - startPointerY;
+            const nextX = initialOffsetX + dx;
+            const nextY = initialOffsetY + dy;
+            activeTarget.dataset.dragX = String(nextX);
+            activeTarget.dataset.dragY = String(nextY);
+            activeTarget.style.transform = `translate(${nextX}px, ${nextY}px)`;
+        });
+
+        const stopDrag = () => {
+            if (!activeTarget) return;
+            const handles = activeTarget.querySelectorAll(".draggable-handle");
+            handles.forEach(h => { h.style.cursor = "grab"; });
+            activeTarget = null;
+        };
+
+        window.addEventListener("pointerup", stopDrag);
+        window.addEventListener("pointercancel", stopDrag);
+    }
+
     bindUIEvents() {
+        this.initDraggableWindows();
+
         document.getElementById("btn-context-action").addEventListener("click", () => {
             window.SFX.playClick();
             this.triggerContextualActionOnCurrentHex();
@@ -3599,6 +4135,13 @@ class GoldenJourneyGame {
             roomPill.addEventListener("click", () => {
                 window.SFX.playClick();
                 this.showWaitingScreen();
+            });
+        }
+        const specQuizPill = document.getElementById("spectator-quiz-toggle-pill");
+        if (specQuizPill) {
+            specQuizPill.addEventListener("click", () => {
+                window.SFX.playClick();
+                this.toggleSpectatorQuizModal();
             });
         }
         const cleanBtn = document.getElementById("btn-toggle-clean-ui");

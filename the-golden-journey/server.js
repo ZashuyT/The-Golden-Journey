@@ -617,9 +617,11 @@ http.createServer(async (req, res) => {
 
         room.status = "turn_order_quiz";
         room.gameState = body.gameState || null;
+        const nowMs = Date.now();
         room.openingQuiz = {
             quiz: quizObj,
-            startedAt: Date.now(),
+            countdownEndsAt: nowMs + 10000,
+            startedAt: nowMs + 10000,
             completed: false,
             rankings: []
         };
@@ -749,6 +751,57 @@ http.createServer(async (req, res) => {
             saveRoomsToDisk();
         }
         return sendJSON(res, 200, { ok: true, version: room.version });
+    }
+
+    // 9B. ANY-TURN P2P MARKET TRANSACTION (0 AP, WORKS ON ANY PLAYER'S TURN)
+    if (urlPath === "/api/room/market-tx" && req.method === "POST") {
+        const body = await parseBody(req);
+        const code = normalizeCode(body.code);
+        const room = rooms.get(code);
+        if (!room || !room.gameState) return sendJSON(res, 404, { ok: false, error: "Room or gameState not found" });
+
+        if (Array.isArray(body.marketListings)) {
+            room.gameState.marketListings = body.marketListings;
+        }
+        if (Array.isArray(body.tradeBulletinNotices)) {
+            room.gameState.tradeBulletinNotices = body.tradeBulletinNotices;
+        }
+        const incomingPlayers = Array.isArray(body.updatedPlayers)
+            ? body.updatedPlayers
+            : (Array.isArray(body.players) ? body.players : null);
+        if (incomingPlayers && Array.isArray(room.gameState.players)) {
+            incomingPlayers.forEach(up => {
+                const target = room.gameState.players.find(p => p.id === up.id);
+                if (target) {
+                    if (typeof up.coins === "number") target.coins = up.coins;
+                    if (typeof up.food === "number") target.food = up.food;
+                    if (typeof up.wood === "number") target.wood = up.wood;
+                    if (typeof up.iron === "number") target.iron = up.iron;
+                    if (Array.isArray(up.specialties)) target.specialties = up.specialties;
+                }
+            });
+        }
+        room.version++;
+        room.updatedAt = Date.now();
+        saveRoomsToDisk();
+        return sendJSON(res, 200, { ok: true, version: room.version, gameState: room.gameState });
+    }
+
+    // 9C. RETURN ROOM TO WAITING LOBBY AFTER VICTORY CELEBRATION (15S)
+    if (urlPath === "/api/room/return-to-lobby" && req.method === "POST") {
+        const body = await parseBody(req);
+        const code = normalizeCode(body.code);
+        const room = rooms.get(code);
+        if (!room) return sendJSON(res, 200, { ok: false, roomClosed: true });
+
+        room.status = "waiting";
+        room.gameState = null;
+        room.openingQuiz = null;
+        room.openingAnswers = {};
+        room.version++;
+        room.updatedAt = Date.now();
+        saveRoomsToDisk();
+        return sendJSON(res, 200, { ok: true, room });
     }
 
     // 10. POLL ROOM STATUS (WITH LIGHTWEIGHT VERSION DELTA CHECK)

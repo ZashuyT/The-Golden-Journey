@@ -1,9 +1,12 @@
 // ============================================================================
-// THE GOLDEN JOURNEY (HÀNH TRÌNH VÀNG SON) — V3.3 EXPANDED 3D WORLD ENGINE
-// - Massive 273-Hex Board across 6 Economic Regions (Rows r = -10 to +10)
-// - Enlarged Hex Tiles (hexRadius = 1.92) & Scaled-Up High-Detail 3D Dioramas
-// - Zero Random Map Keys (Keys are exclusively earned via Ports & Cross-Region Trade)
-// - High-Visibility 3D Ships with Smooth Step-by-Step Water Path Navigation
+// THE GOLDEN JOURNEY (HÀNH TRÌNH VÀNG SON) — V5.0 LIVING S-SHAPED VIETNAM 3D WORLD
+// - Borderless Open-Ocean S-Shaped Vietnam Map (No Wooden Frame)
+// - Every Land Hex has a Unique, Animated 3D Diorama (Waterwheels, Windmills,
+//   Village Communal Halls, Hoi An Lanterns, Campfires, Skyscrapers, Orchards)
+// - Living Ocean Ecosystem: Jumping Dolphin Pods, Swimming Fish Schools,
+//   Flapping Seagulls, Traditional Vietnamese Sampans, Lighthouses & Oil Rigs
+// - Mathematically Balanced Port, Monument, Resource & Spawn Coordinates with
+//   Wide Open Sea Lanes so Ships Route Cleanly Around Special Tiles
 // ============================================================================
 
 class World3D {
@@ -12,13 +15,14 @@ class World3D {
         this.onHexClick = onHexClickCallback;
         this.onHexHover = onHexHoverCallback;
 
-        // Larger hex radius so every tile and 3D diorama is big, clear, and easy to click
         this.hexRadius = 1.92;
         this.hexTiles = [];
         this.hexMap = new Map(); // "q,r" -> tileObj
         this.shipMeshes = new Map(); // playerId -> THREE.Group
         this.floatingEffects = [];
         this.waterVertices = [];
+        this.animatedLandProps = [];
+        this.fairSpawnAnchors = [];
         this.activeNPCTile = null;
 
         this.raycaster = new THREE.Raycaster();
@@ -26,7 +30,7 @@ class World3D {
         this.hoveredHex = null;
         this.reachablePaths = new Map(); // "q,r" -> { steps, path: [tile, ...] }
 
-        this.weatherMode = "sunny"; // sunny | sunset | night | rain | storm
+        this.weatherMode = "sunny";
         this.lightningFlash = 0;
 
         this.clock = new THREE.Clock();
@@ -38,14 +42,14 @@ class World3D {
 
     initScene() {
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x0c4a6e);
-        this.scene.fog = new THREE.FogExp2(0x0c4a6e, 0.0042);
+        this.scene.background = new THREE.Color(0x0a4162);
+        this.scene.fog = new THREE.FogExp2(0x0a4162, 0.0036);
 
         const w = this.container.clientWidth || window.innerWidth;
         const h = this.container.clientHeight || window.innerHeight;
 
-        this.camera = new THREE.PerspectiveCamera(42, w / h, 0.5, 520);
-        this.camera.position.set(16, 54, 44);
+        this.camera = new THREE.PerspectiveCamera(42, w / h, 0.5, 680);
+        this.camera.position.set(14, 68, 56);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         this.renderer.setSize(w, h);
@@ -53,7 +57,7 @@ class World3D {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.15;
+        this.renderer.toneMappingExposure = 1.18;
         this.container.innerHTML = "";
         this.container.appendChild(this.renderer.domElement);
 
@@ -63,29 +67,29 @@ class World3D {
         this.controls.maxPolarAngle = Math.PI / 2.22;
         this.controls.minPolarAngle = Math.PI / 10;
         this.controls.minDistance = 14;
-        this.controls.maxDistance = 135;
-        this.controls.target.set(2, 0, 0);
+        this.controls.maxDistance = 175;
+        this.controls.target.set(2, 0, 2);
 
-        this.hemiLight = new THREE.HemisphereLight(0xfef9c3, 0x0369a1, 0.98);
-        this.hemiLight.position.set(0, 70, 0);
+        this.hemiLight = new THREE.HemisphereLight(0xfef9c3, 0x0369a1, 1.02);
+        this.hemiLight.position.set(0, 75, 0);
         this.scene.add(this.hemiLight);
 
-        this.sunLight = new THREE.DirectionalLight(0xfffbeb, 1.48);
-        this.sunLight.position.set(42, 68, 34);
+        this.sunLight = new THREE.DirectionalLight(0xfffbeb, 1.52);
+        this.sunLight.position.set(44, 72, 36);
         this.sunLight.castShadow = true;
         this.sunLight.shadow.mapSize.width = 2048;
         this.sunLight.shadow.mapSize.height = 2048;
         this.sunLight.shadow.camera.near = 5;
-        this.sunLight.shadow.camera.far = 210;
-        const d = 78;
+        this.sunLight.shadow.camera.far = 220;
+        const d = 82;
         this.sunLight.shadow.camera.left = -d;
         this.sunLight.shadow.camera.right = d;
         this.sunLight.shadow.camera.top = d;
         this.sunLight.shadow.camera.bottom = -d;
         this.scene.add(this.sunLight);
 
-        this.rimLight = new THREE.DirectionalLight(0x38bdf8, 0.52);
-        this.rimLight.position.set(-45, 32, -38);
+        this.rimLight = new THREE.DirectionalLight(0x38bdf8, 0.56);
+        this.rimLight.position.set(-48, 36, -40);
         this.scene.add(this.rimLight);
 
         this.boardGroup = new THREE.Group();
@@ -110,7 +114,7 @@ class World3D {
             opacity: 0.76
         });
 
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 24; i++) {
             const cGroup = new THREE.Group();
             const puffs = 3 + Math.floor(Math.random() * 3);
             for (let p = 0; p < puffs; p++) {
@@ -120,7 +124,7 @@ class World3D {
                 puff.position.set((p - 1.5) * 1.4, Math.random() * 0.35, (Math.random() - 0.5) * 1.0);
                 cGroup.add(puff);
             }
-            cGroup.position.set((Math.random() - 0.5) * 145, 20 + Math.random() * 6, (Math.random() - 0.5) * 145);
+            cGroup.position.set((Math.random() - 0.5) * 165, 21 + Math.random() * 7, (Math.random() - 0.5) * 165);
             this.weatherGroup.add(cGroup);
             this.clouds.push({
                 mesh: cGroup,
@@ -133,9 +137,9 @@ class World3D {
         const rainGeo = new THREE.BufferGeometry();
         const rainPositions = new Float32Array(rainCount * 6);
         for (let i = 0; i < rainCount; i++) {
-            const rx = (Math.random() - 0.5) * 140;
+            const rx = (Math.random() - 0.5) * 150;
             const ry = Math.random() * 42;
-            const rz = (Math.random() - 0.5) * 140;
+            const rz = (Math.random() - 0.5) * 150;
             const idx = i * 6;
             rainPositions[idx] = rx;
             rainPositions[idx + 1] = ry;
@@ -154,13 +158,13 @@ class World3D {
         this.rainLines.visible = false;
         this.weatherGroup.add(this.rainLines);
 
-        const starCount = 420;
+        const starCount = 460;
         const starGeo = new THREE.BufferGeometry();
         const starPos = new Float32Array(starCount * 3);
         for (let i = 0; i < starCount; i++) {
-            starPos[i * 3] = (Math.random() - 0.5) * 200;
+            starPos[i * 3] = (Math.random() - 0.5) * 220;
             starPos[i * 3 + 1] = 3 + Math.random() * 45;
-            starPos[i * 3 + 2] = (Math.random() - 0.5) * 200;
+            starPos[i * 3 + 2] = (Math.random() - 0.5) * 220;
         }
         starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
         this.starField = new THREE.Points(
@@ -174,8 +178,8 @@ class World3D {
         this.weatherMode = mode;
         const presets = {
             sunny: {
-                bg: 0x0c4a6e, fog: 0x0c4a6e, hemiSky: 0xfef9c3, hemiGround: 0x0369a1, hemiInt: 0.98,
-                sunCol: 0xfffbeb, sunInt: 1.48, sunPos: [42, 68, 34], cloudCol: 0xffffff, cloudOp: 0.76,
+                bg: 0x0a4162, fog: 0x0a4162, hemiSky: 0xfef9c3, hemiGround: 0x0369a1, hemiInt: 1.02,
+                sunCol: 0xfffbeb, sunInt: 1.52, sunPos: [44, 72, 36], cloudCol: 0xffffff, cloudOp: 0.76,
                 rain: false, waveAmp: 1.0, starsOp: 0.0
             },
             sunset: {
@@ -220,7 +224,7 @@ class World3D {
 
     initOcean() {
         this.waveMultiplier = 1.0;
-        const oceanGeo = new THREE.PlaneGeometry(280, 280, 110, 110);
+        const oceanGeo = new THREE.PlaneGeometry(320, 320, 120, 120);
         oceanGeo.rotateX(-Math.PI / 2);
 
         const pos = oceanGeo.attributes.position;
@@ -235,11 +239,11 @@ class World3D {
         }
 
         const oceanMat = new THREE.MeshStandardMaterial({
-            color: 0x0f3b57,
-            emissive: 0x072235,
-            emissiveIntensity: 0.25,
-            roughness: 0.22,
-            metalness: 0.45,
+            color: 0x0c4466,
+            emissive: 0x06253a,
+            emissiveIntensity: 0.28,
+            roughness: 0.20,
+            metalness: 0.48,
             flatShading: true,
             transparent: true,
             opacity: 0.96
@@ -251,12 +255,12 @@ class World3D {
         this.scene.add(this.oceanMesh);
 
         this.foamRings = [];
-        const foamMat = new THREE.MeshBasicMaterial({ color: 0xcbd5e1, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
-        for (let i = 0; i < 55; i++) {
-            const rGeo = new THREE.RingGeometry(0.42, 0.62, 16);
+        const foamMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.30, side: THREE.DoubleSide });
+        for (let i = 0; i < 65; i++) {
+            const rGeo = new THREE.RingGeometry(0.42, 0.66, 16);
             rGeo.rotateX(-Math.PI / 2);
             const ring = new THREE.Mesh(rGeo, foamMat.clone());
-            ring.position.set((Math.random() - 0.5) * 160, -0.05, (Math.random() - 0.5) * 160);
+            ring.position.set((Math.random() - 0.5) * 180, -0.05, (Math.random() - 0.5) * 180);
             this.scene.add(ring);
             this.foamRings.push({ mesh: ring, speed: 0.6 + Math.random() * 0.8, offset: Math.random() * 6 });
         }
@@ -268,13 +272,18 @@ class World3D {
         this.sceneryGroup = new THREE.Group();
         this.scene.add(this.sceneryGroup);
 
+        // 1. 10 Picturesque Limestone Karst Islands & Atolls around the Outer Sea
         const karstLocations = [
-            { x: 44, z: -38, scale: 1.85, rot: 0.4 },
-            { x: 48, z: -12, scale: 1.55, rot: 1.2 },
-            { x: 45, z: 18, scale: 1.9, rot: 2.1 },
-            { x: -42, z: -28, scale: 1.75, rot: 0.8 },
+            { x: 42, z: -38, scale: 1.9, rot: 0.4 },
+            { x: 46, z: -18, scale: 1.6, rot: 1.2 },
+            { x: 48, z: 2, scale: 1.75, rot: 0.9 },
+            { x: 45, z: 20, scale: 1.95, rot: 2.1 },
+            { x: 38, z: 40, scale: 1.7, rot: 2.8 },
+            { x: 14, z: 50, scale: 1.55, rot: 1.6 },
+            { x: -18, z: 48, scale: 1.65, rot: 0.5 },
+            { x: -42, z: -32, scale: 1.75, rot: 0.8 },
             { x: -44, z: 28, scale: 1.8, rot: 1.9 },
-            { x: 34, z: 42, scale: 1.65, rot: 2.8 }
+            { x: 20, z: -48, scale: 1.6, rot: 2.4 }
         ];
         karstLocations.forEach(kl => {
             const kMesh = ProceduralModels.createDistantKarstOutcrop(kl.scale);
@@ -283,61 +292,114 @@ class World3D {
             this.sceneryGroup.add(kMesh);
         });
 
+        // 2. 4 Coastal & Island Lighthouses with Rotating Light Beams
         this.ambientLighthouses = [];
         const lhCoords = [
-            { x: 38, z: -24 },
-            { x: 39, z: 6 },
-            { x: 26, z: 38 }
+            { x: 36, z: -28 },
+            { x: 40, z: -4 },
+            { x: 38, z: 14 },
+            { x: 24, z: 42 }
         ];
         lhCoords.forEach(lc => {
             const lh = ProceduralModels.createSeaLighthouseIsland();
             lh.position.set(lc.x, -0.15, lc.z);
-            lh.scale.setScalar(1.35);
+            lh.scale.setScalar(1.38);
             this.sceneryGroup.add(lh);
             this.ambientLighthouses.push(lh);
         });
 
+        // 3. 3 Offshore Oil & Gas Platforms (Bạch Hổ / Lan Tây / Rồng Đôi)
         this.ambientOilRigs = [];
         const rigCoords = [
-            { x: 30, z: 28 },
-            { x: 36, z: 34 }
+            { x: 28, z: 28 },
+            { x: 35, z: 34 },
+            { x: 18, z: 42 }
         ];
         rigCoords.forEach(rc => {
             const rig = ProceduralModels.createOffshoreOilRig();
             rig.position.set(rc.x, -0.15, rc.z);
-            rig.scale.setScalar(1.35);
+            rig.scale.setScalar(1.38);
             this.sceneryGroup.add(rig);
             this.ambientOilRigs.push(rig);
         });
 
+        // 4. 12 Traditional Vietnamese Sailing Sampans & Fishing Boats
         this.ambientSampans = [];
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 12; i++) {
             const sampan = ProceduralModels.createAmbientFishingSampan();
-            sampan.scale.setScalar(1.4);
-            const radius = 40 + (i % 3) * 6.5;
-            const angle = (i / 8) * Math.PI * 2;
+            sampan.scale.setScalar(1.42);
+            const radius = 36 + (i % 4) * 5.5;
+            const angle = (i / 12) * Math.PI * 2;
             this.sceneryGroup.add(sampan);
             this.ambientSampans.push({
                 mesh: sampan,
                 radius,
                 angle,
-                speed: (0.05 + (i % 3) * 0.02) * (i % 2 === 0 ? 1 : -1),
-                centerX: 3,
+                speed: (0.055 + (i % 3) * 0.02) * (i % 2 === 0 ? 1 : -1),
+                centerX: 6,
                 centerZ: 0
             });
         }
 
+        // 5. 6 Jumping Dolphin Pods leaping out of the waves!
+        this.ambientDolphins = [];
+        const dolphinCenters = [
+            { x: 30, z: -22 },
+            { x: 34, z: -6 },
+            { x: 32, z: 12 },
+            { x: 26, z: 24 },
+            { x: 8, z: 42 },
+            { x: -24, z: 38 }
+        ];
+        dolphinCenters.forEach((dc, idx) => {
+            const pod = ProceduralModels.createJumpingDolphinPod();
+            pod.scale.setScalar(1.35);
+            this.sceneryGroup.add(pod);
+            this.ambientDolphins.push({
+                mesh: pod,
+                centerX: dc.x,
+                centerZ: dc.z,
+                radius: 4.5 + (idx % 2) * 1.8,
+                angle: idx * 1.2,
+                speed: 0.45 + (idx % 3) * 0.08,
+                jumpPhase: idx * 1.1
+            });
+        });
+
+        // 6. 8 Glowing Fish Schools swimming beneath the crystal water
+        this.ambientFishSchools = [];
+        const fishCenters = [
+            { x: 26, z: -30 },
+            { x: 32, z: -14 },
+            { x: 35, z: 4 },
+            { x: 30, z: 18 },
+            { x: 22, z: 32 },
+            { x: 2, z: 40 },
+            { x: -16, z: 34 },
+            { x: 16, z: -38 }
+        ];
+        fishCenters.forEach((fc, idx) => {
+            const school = ProceduralModels.createGlowingFishSchool();
+            school.position.set(fc.x, -0.08, fc.z);
+            this.sceneryGroup.add(school);
+            this.ambientFishSchools.push({
+                mesh: school,
+                speed: 0.65 + (idx % 3) * 0.2
+            });
+        });
+
+        // 7. 10 Flocks of Seagulls & Lac Birds with Animated Flapping Wings
         this.ambientSeagulls = [];
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 10; i++) {
             const flock = ProceduralModels.createSeagullFlock();
-            flock.scale.setScalar(1.35);
+            flock.scale.setScalar(1.38);
             this.sceneryGroup.add(flock);
             this.ambientSeagulls.push({
                 mesh: flock,
-                radius: 22 + i * 5.0,
-                angle: i * 1.1,
-                speed: 0.20 + (i % 2) * 0.07,
-                height: 10.5 + (i % 3) * 2.2
+                radius: 18 + i * 3.8,
+                angle: i * 0.9,
+                speed: 0.22 + (i % 3) * 0.06,
+                height: 9.5 + (i % 4) * 2.0
             });
         }
     }
@@ -354,12 +416,12 @@ class World3D {
     }
 
     // ------------------------------------------------------------------------
-    // V3.3 EXPANDED 273-HEX MAP ACROSS 6 ECONOMIC REGIONS (Rows r = -10 to +10)
-    // - 21 Rows North-to-South x 13 Columns West-to-East = 273 Large Hexes!
-    // - Western Mainland Mountain & Highland Ranges + Peninsulas (Impassable)
-    // - Coastal Bays, Archipelagos & Open Sea Channels with Strategic Reefs
-    // - All 9 Monuments, 6 Ports & 18 Resource Nodes placed on Navigable Coastal/Island Hexes
-    // - Zero Random Map Keys (Keys are bought at Ports or earned via Cross-Vietnam Trade)
+    // V5.0 S-SHAPED VIETNAM LIVING 3D MAP (Rows r = -14..+14, 551 Hexes)
+    // - No Wooden Frame: Seamless transition into the living ocean
+    // - Every Land Tile has a Unique, Animated 3D Diorama
+    // - Mathematically Balanced Placement of 6 Ports, 9 Monuments, 15 Resource
+    //   Nodes & 5 Starting Anchorages with Wide Open Sea Channels so ships can
+    //   route around any Monument/Port/Resource without ever getting blocked!
     // ------------------------------------------------------------------------
     buildBoard(monumentAssignments) {
         while (this.boardGroup.children.length > 0) {
@@ -367,98 +429,141 @@ class World3D {
         }
         this.hexTiles = [];
         this.hexMap.clear();
+        this.animatedLandProps = [];
+        this.fairSpawnAnchors = [];
         this.activeNPCTile = null;
 
-        // Region mapping by row r (-10 to +10)
-        const getRegionIdForRow = (r) => {
-            if (r <= -7) return 0; // 0: Trung du & Miền núi Bắc Bộ (r = -10..-7)
-            if (r <= -4) return 1; // 1: Đồng bằng Sông Hồng (r = -6..-4)
-            if (r <= 0)  return 2; // 2: Bắc Trung Bộ & Duyên hải Miền Trung (r = -3..0)
-            if (r <= 3)  return 3; // 3: Tây Nguyên (r = 1..3)
-            if (r <= 6)  return 4; // 4: Đông Nam Bộ (r = 4..6)
-            return 5;              // 5: Đồng bằng Sông Cửu Long (r = 7..10)
+        // S-Curve Profile by row r (-14 to +14): [vnWestCol, vnCoastCol, regionId]
+        const sCurveProfile = {
+            // 1. TRUNG DU & MIỀN NÚI BẮC BỘ (Broad Northern Mountain Arc & Ha Long Bay)
+            "-14": [-6,  1, 0],
+            "-13": [-7,  1, 0],
+            "-12": [-7,  1, 0],
+            "-11": [-6,  0, 0],
+
+            // 2. ĐỒNG BẰNG SÔNG HỒNG (Concave Gulf of Tonkin & Golden Alluvial Delta)
+            "-10": [-5, -1, 1],
+            "-9":  [-4, -1, 1],
+            "-8":  [-4, -1, 1],
+            "-7":  [-4, -1, 1],
+
+            // 3. BẮC TRUNG BỘ & DUYÊN HẢI MIỀN TRUNG (Narrow Waist Curving South-East)
+            "-6":  [-4, -1, 2],
+            "-5":  [-3,  0, 2],
+            "-4":  [-3,  0, 2],
+            "-3":  [-2,  1, 2],
+            "-2":  [-1,  2, 2],
+            "-1":  [-1,  2, 2],
+            "0":   [ 0,  3, 2],
+            "1":   [ 0,  3, 2],
+
+            // 4. TÂY NGUYÊN & NAM TRUNG BỘ (Elevated Basalt Plateau & Easternmost Bulge)
+            "2":   [-1,  3, 3],
+            "3":   [-1,  4, 3],
+            "4":   [-1,  3, 3],
+            "5":   [-1,  2, 3],
+
+            // 5. ĐÔNG NAM BỘ (South-Westward Bend toward Saigon & Continental Shelf)
+            "6":   [-2,  2, 4],
+            "7":   [-2,  1, 4],
+            "8":   [-2,  1, 4],
+            "9":   [-3,  0, 4],
+
+            // 6. ĐỒNG BẰNG SÔNG CỬU LONG (Southern Mekong Delta Hook & Mũi Cà Mau)
+            "10":  [-5,  0, 5],
+            "11":  [-6, -1, 5],
+            "12":  [-6, -1, 5],
+            "13":  [-6, -2, 5],
+            "14":  [-5, -3, 5]
         };
 
-        // Special Landmark / Port / Resource / Reef Placements keyed by "r,col" (where col = -5..+7)
+        // 5 Mathematically Calibrated Starting Anchorages in the Open Sea Lane
+        // Every anchorage has 360-degree open-water clearance and is 2-3 pure-sea steps
+        // from a Port, a Resource node, and a Monument!
+        const spawnAnchorKeys = new Set([
+            "-10,3", // Anchor 1 (Vịnh Bắc Bộ): 3 steps to Cái Lân/Hạ Long/Hải Phòng & Food/Wood/Iron
+            "-6,4",  // Anchor 2 (Bắc Trung Bộ): 3 steps to Hải Phòng/Tiên Sa & Phong Nha & Food/Wood/Iron
+            "-1,5",  // Anchor 3 (Trung Trung Bộ): 3 steps to Tiên Sa/Quy Nhơn & Huế/Mỹ Sơn & Food/Wood/Iron
+            "5,6",   // Anchor 4 (Nam Trung Bộ - Đông Nam Bộ): 3 steps to Quy Nhơn/Cái Mép & Tây Nguyên/Bến Nhà Rồng
+            "10,3"   // Anchor 5 (Nam Bộ - Cửu Long): 3 steps to Cái Mép/Cần Thơ & Cái Răng & Food/Wood/Iron
+        ]);
+
+        // Carefully Engineered Special Placements (6 Ports, 9 Monuments, 15 Resource Nodes: 5 Food, 5 Wood, 5 Iron)
+        // Every POI has open water around it so ships can ALWAYS sail around any POI without blocking!
         const specialPlacements = {
-            // REGION 0: TRUNG DU & MIỀN NÚI BẮC BỘ (r = -10..-7)
-            "-10,-2": { terrain: "coast", monumentId: "mon_sapa", navigable: true },
-            "-10,1":  { terrain: "coast", resourceType: "iron", navigable: true },
-            "-9,-2":  { terrain: "coast", resourceType: "wood", navigable: true },
-            "-9,1":   { terrain: "coast", isPort: true, portName: "Thương Cảng Cái Lân (Quảng Ninh)", navigable: true },
-            "-9,4":   { terrain: "island", monumentId: "mon_halong", navigable: true },
-            "-8,0":   { terrain: "coast", resourceType: "food", navigable: true },
-            "-8,3":   { terrain: "reef", navigable: false },
-            "-7,-1":  { terrain: "coast", resourceType: "iron", navigable: true },
-            "-7,5":   { terrain: "reef", navigable: false },
+            // 1. TRUNG DU & MIỀN NÚI BẮC BỘ (r = -14..-11)
+            "-14,1":  { terrain: "coast", monumentId: "mon_sapa", navigable: true },
+            "-13,3":  { terrain: "coast", resourceType: "iron", navigable: true },
+            "-12,1":  { terrain: "coast", isPort: true, portName: "Thương Cảng Cái Lân (Quảng Ninh)", navigable: true },
+            "-12,4":  { terrain: "coast", resourceType: "wood", navigable: true },
+            "-11,2":  { terrain: "island", monumentId: "mon_halong", navigable: true },
+            "-13,6":  { terrain: "reef", navigable: false },
 
-            // REGION 1: ĐỒNG BẰNG SÔNG HỒNG (r = -6..-4)
-            "-6,-2":  { terrain: "coast", monumentId: "mon_vanmieu", navigable: true },
-            "-6,1":   { terrain: "delta_land", navigable: false },
-            "-5,-1":  { terrain: "coast", isPort: true, portName: "Thương Cảng Hải Phòng", navigable: true },
-            "-5,2":   { terrain: "coast", resourceType: "food", navigable: true },
-            "-5,4":   { terrain: "reef", navigable: false },
-            "-4,-2":  { terrain: "coast", resourceType: "food", navigable: true },
-            "-4,0":   { terrain: "coast", resourceType: "wood", navigable: true },
-            "-4,3":   { terrain: "reef", navigable: false },
+            // 2. ĐỒNG BẰNG SÔNG HỒNG (r = -10..-7)
+            "-10,0":  { terrain: "coast", resourceType: "food", navigable: true },
+            "-9,-1":  { terrain: "coast", monumentId: "mon_vanmieu", navigable: true },
+            "-8,-1":  { terrain: "coast", isPort: true, portName: "Thương Cảng Hải Phòng", navigable: true },
+            "-7,1":   { terrain: "coast", resourceType: "wood", navigable: true },
+            "-8,5":   { terrain: "reef", navigable: false },
 
-            // REGION 2: BẮC TRUNG BỘ & DUYÊN HẢI MIỀN TRUNG (r = -3..0)
-            "-3,-2":  { terrain: "coast", monumentId: "mon_phongnha", navigable: true },
-            "-3,0":   { terrain: "coast", resourceType: "iron", navigable: true },
-            "-2,-1":  { terrain: "mountain", navigable: false }, // Mũi Hoành Sơn
-            "-2,2":   { terrain: "island", monumentId: "mon_hue", navigable: true },
-            "-2,5":   { terrain: "reef", navigable: false },
-            "-1,-2":  { terrain: "coast", resourceType: "wood", navigable: true },
-            "-1,1":   { terrain: "coast", isPort: true, portName: "Thương Cảng Tiên Sa (Đà Nẵng)", navigable: true },
-            "-1,3":   { terrain: "reef", navigable: false },
-            "0,-2":   { terrain: "coast", resourceType: "food", navigable: true },
-            "0,1":    { terrain: "sea", isCentralHub: true, navigable: true },
-            "0,4":    { terrain: "island", monumentId: "mon_myson", navigable: true },
+            // 3. BẮC TRUNG BỘ & DUYÊN HẢI MIỀN TRUNG (r = -6..+1)
+            "-6,2":   { terrain: "coast", resourceType: "iron", navigable: true },
+            "-5,0":   { terrain: "coast", monumentId: "mon_phongnha", navigable: true },
+            "-4,3":   { terrain: "coast", resourceType: "food", navigable: true },
+            "-3,1":   { terrain: "coast", isPort: true, portName: "Thương Cảng Tiên Sa (Đà Nẵng)", navigable: true },
+            "-2,4":   { terrain: "coast", resourceType: "wood", navigable: true },
+            "-2,7":   { terrain: "archipelago", archipelagoName: "QUẦN ĐẢO HOÀNG SA", archipelagoSub: "TP. Đà Nẵng • Chủ Quyền Việt Nam", navigable: false },
+            "-1,2":   { terrain: "coast", monumentId: "mon_hue", navigable: true },
+            "0,5":    { terrain: "coast", resourceType: "iron", navigable: true },
+            "1,3":    { terrain: "coast", monumentId: "mon_myson", navigable: true },
 
-            // REGION 3: TÂY NGUYÊN & LIÊN KẾT DUYÊN HẢI (r = 1..3)
-            "1,-2":   { terrain: "coast", monumentId: "mon_taynguyen", navigable: true },
-            "1,1":    { terrain: "coast", isPort: true, portName: "Thương Cảng Liên Vùng Tây Nguyên – Phú Yên", navigable: true },
-            "1,3":    { terrain: "reef", navigable: false },
-            "2,-2":   { terrain: "coast", resourceType: "wood", navigable: true },
-            "2,0":    { terrain: "highland", navigable: false },
-            "2,2":    { terrain: "coast", resourceType: "iron", navigable: true },
-            "3,-1":   { terrain: "coast", resourceType: "food", navigable: true },
-            "3,4":    { terrain: "reef", navigable: false },
+            // 4. TÂY NGUYÊN & LIÊN KẾT NAM TRUNG BỘ (r = +2..+5)
+            "2,3":    { terrain: "coast", isPort: true, portName: "Thương Cảng Liên Vùng Tây Nguyên – Quy Nhơn", navigable: true },
+            "3,6":    { terrain: "coast", resourceType: "food", navigable: true },
+            "4,3":    { terrain: "coast", monumentId: "mon_taynguyen", navigable: true },
+            "5,4":    { terrain: "coast", resourceType: "wood", navigable: true },
+            "4,8":    { terrain: "reef", navigable: false },
 
-            // REGION 4: ĐÔNG NAM BỘ (r = 4..6)
-            "4,-2":   { terrain: "coast", resourceType: "wood", navigable: true },
-            "4,1":    { terrain: "coast", monumentId: "mon_bennharong", navigable: true },
-            "5,-1":   { terrain: "coast", isPort: true, portName: "Thương Cảng Quốc Tế Cái Mép – Sài Gòn", navigable: true },
-            "5,2":    { terrain: "delta_land", navigable: false },
-            "5,4":    { terrain: "reef", navigable: false },
-            "6,-2":   { terrain: "coast", resourceType: "iron", navigable: true },
-            "6,1":    { terrain: "coast", resourceType: "wood", navigable: true },
+            // 5. ĐÔNG NAM BỘ (r = +6..+9)
+            "6,3":    { terrain: "coast", resourceType: "iron", navigable: true },
+            "7,1":    { terrain: "coast", isPort: true, portName: "Thương Cảng Quốc Tế Cái Mép – Sài Gòn", navigable: true },
+            "8,1":    { terrain: "coast", monumentId: "mon_bennharong", navigable: true },
+            "8,4":    { terrain: "coast", resourceType: "food", navigable: true },
+            "8,7":    { terrain: "archipelago", archipelagoName: "QUẦN ĐẢO TRƯỜNG SA", archipelagoSub: "Tỉnh Khánh Hòa • Chủ Quyền Việt Nam", navigable: false },
 
-            // REGION 5: ĐỒNG BẰNG SÔNG CỬU LONG (r = 7..10)
-            "7,-2":   { terrain: "coast", resourceType: "food", navigable: true },
-            "7,1":    { terrain: "delta_land", navigable: false },
-            "8,-1":   { terrain: "coast", monumentId: "mon_cairang", navigable: true },
-            "8,3":    { terrain: "reef", navigable: false },
-            "9,-2":   { terrain: "coast", isPort: true, portName: "Thương Cảng Cần Thơ – Cửu Long", navigable: true },
-            "9,1":    { terrain: "coast", resourceType: "food", navigable: true },
-            "10,-1":  { terrain: "coast", resourceType: "food", navigable: true },
-            "10,2":   { terrain: "coast", resourceType: "wood", navigable: true }
+            // 6. ĐỒNG BẰNG SÔNG CỬU LONG (r = +10..+14, with Navigable Mekong Channels)
+            "10,1":   { terrain: "coast", resourceType: "wood", navigable: true },
+            "10,-2":  { terrain: "river_channel", navigable: true },
+            "11,-3":  { terrain: "river_channel", navigable: true },
+            "11,-2":  { terrain: "river_channel", navigable: true },
+            "11,-1":  { terrain: "coast", monumentId: "mon_cairang", navigable: true },
+            "11,2":   { terrain: "coast", resourceType: "iron", navigable: true },
+            "12,-3":  { terrain: "river_channel", navigable: true },
+            "12,-1":  { terrain: "coast", isPort: true, portName: "Thương Cảng Cần Thơ – Cửu Long", navigable: true },
+            "13,0":   { terrain: "coast", resourceType: "food", navigable: true },
+            "12,5":   { terrain: "reef", navigable: false }
         };
 
         const layoutSpec = [];
-        for (let r = -10; r <= 10; r++) {
-            const regionId = getRegionIdForRow(r);
+        for (let r = -14; r <= 14; r++) {
+            const [vnWest, vnCoast, regionId] = sCurveProfile[String(r)] || [-3, 0, 2];
             const qCenterOffset = -Math.floor(r / 2);
 
-            for (let col = -5; col <= 7; col++) {
+            for (let col = -9; col <= 9; col++) {
                 const q = qCenterOffset + col;
                 const key = `${r},${col}`;
                 const custom = specialPlacements[key];
+                const isSpawnAnchor = spawnAnchorKeys.has(key);
+
+                if (isSpawnAnchor) {
+                    this.fairSpawnAnchors.push({ q, r, col, regionId });
+                }
 
                 if (custom) {
                     layoutSpec.push({
                         q,
                         r,
+                        col,
                         regionId,
                         terrain: custom.terrain,
                         navigable: custom.navigable !== false,
@@ -466,40 +571,52 @@ class World3D {
                         isPort: !!custom.isPort,
                         portName: custom.portName || null,
                         resourceType: custom.resourceType || null,
-                        isCentralHub: !!custom.isCentralHub,
-                        isSpawnRim: col === 7
+                        archipelagoName: custom.archipelagoName || null,
+                        archipelagoSub: custom.archipelagoSub || null,
+                        isSpawnRim: isSpawnAnchor
                     });
-                } else if (col <= -3) {
-                    // Western Mainland Mountain / Highland / Delta Spine (Impassable)
-                    const mainTerrain = (regionId === 0 || regionId === 2)
-                        ? "mountain"
-                        : (regionId === 3 ? "highland" : "delta_land");
+                } else if (col < vnWest) {
+                    // South-West of Mekong Delta (r >= 10, col <= vnWest - 1) is Gulf of Thailand (Vịnh Thái Lan)
+                    // Far West (col <= -7) blends into the ocean so there is no artificial rectangular block!
+                    const isGulfOfThailand = (r >= 10 && col <= vnWest - 1);
+                    const isOuterWesternSea = (col <= vnWest - 4);
+                    if (isGulfOfThailand || isOuterWesternSea) {
+                        continue; // Let the natural 3D Ocean & islands shine without flat border tiles!
+                    }
                     layoutSpec.push({
                         q,
                         r,
+                        col,
+                        regionId,
+                        terrain: "parchment_land",
+                        navigable: false
+                    });
+                } else if (col >= vnWest && col < vnCoast) {
+                    let mainTerrain = "delta_land";
+                    if (regionId === 0) mainTerrain = "mountain";
+                    else if (regionId === 1) mainTerrain = "delta_land";
+                    else if (regionId === 2) mainTerrain = (col === vnWest ? "mountain" : "coast_land");
+                    else if (regionId === 3) mainTerrain = "highland";
+                    else if (regionId === 4) mainTerrain = "southeast_land";
+                    else mainTerrain = "delta_land";
+
+                    layoutSpec.push({
+                        q,
+                        r,
+                        col,
                         regionId,
                         terrain: mainTerrain,
                         navigable: false
                     });
-                } else if (col === -2) {
-                    // Coastal belt (some peninsulas jutting out, mostly navigable coastal waters)
-                    const isPeninsula = ((r + 10) % 4 === 1);
-                    layoutSpec.push({
-                        q,
-                        r,
-                        regionId,
-                        terrain: isPeninsula ? (regionId <= 2 ? "mountain" : "delta_land") : "coast",
-                        navigable: !isPeninsula
-                    });
                 } else {
-                    // Open East Sea shipping lanes & outer spawn rim
                     layoutSpec.push({
                         q,
                         r,
+                        col,
                         regionId,
-                        terrain: "sea",
+                        terrain: col === vnCoast ? "coast" : "sea",
                         navigable: true,
-                        isSpawnRim: col === 7
+                        isSpawnRim: isSpawnAnchor
                     });
                 }
             }
@@ -511,6 +628,31 @@ class World3D {
             this.hexMap.set(`${spec.q},${spec.r}`, tile);
             this.boardGroup.add(tile.group);
         });
+
+        this.buildRegionBanners();
+    }
+
+    buildRegionBanners() {
+        // 6 Region Parchment Banners floating above the S-Curve (NO Wooden Frame!)
+        const regionBanners = [
+            { r: -13, col: -4, line1: "1. TRUNG DU &", line2: "MIỀN NÚI BẮC BỘ", color: "#2d6a4f" },
+            { r: -9,  col: -3, line1: "2. ĐỒNG BẰNG", line2: "SÔNG HỒNG", color: "#b58328" },
+            { r: -3,  col: -1, line1: "3. DUYÊN HẢI", line2: "MIỀN TRUNG", color: "#2b6f86" },
+            { r: 3,   col: 0,  line1: "4. TÂY NGUYÊN", line2: "CAO NGUYÊN ĐẤT ĐỎ", color: "#9c4a1a" },
+            { r: 7,   col: -1, line1: "5. ĐÔNG NAM BỘ", line2: "TRUNG TÂM CÔNG NGHIỆP", color: "#8c3b4a" },
+            { r: 12,  col: -4, line1: "6. ĐỒNG BẰNG", line2: "SÔNG CỬU LONG", color: "#4d7c3f" }
+        ];
+        regionBanners.forEach(rb => {
+            const q = -Math.floor(rb.r / 2) + rb.col;
+            const { x, z } = this.axialToWorld(q, rb.r);
+            const sprite = ProceduralModels.createRegionBannerSprite(rb.line1, rb.line2, rb.color, 4.8, 1.36);
+            sprite.position.set(x, 3.05, z);
+            this.boardGroup.add(sprite);
+        });
+
+        // 3D Nautical Compass Rose in the Western Waters
+        const compass = ProceduralModels.createTabletopCompassAndTitlePlaque();
+        this.boardGroup.add(compass);
     }
 
     createHexTile(spec, index, monumentAssignments) {
@@ -519,21 +661,43 @@ class World3D {
         const group = new THREE.Group();
         group.position.set(x, 0, z);
 
+        // Deterministic per-tile height & color micro-variation so adjacent land hexes never look flat or identical!
+        const tileSeed = Math.abs((spec.q * 49297) ^ (spec.r * 9301));
+        const jitter = ProceduralModels.seededRandom(tileSeed);
+
         let height = 0.28;
         let topColor = new THREE.Color(region.color);
 
         if (spec.terrain === "sea") {
             height = 0.14;
-            topColor = new THREE.Color(spec.isCentralHub ? 0x164e63 : 0x0f3b57);
+            topColor = new THREE.Color(spec.isSpawnRim ? 0x155e75 : 0x0f3b57);
+        } else if (spec.terrain === "river_channel") {
+            height = 0.19;
+            topColor = new THREE.Color(0x0284c7);
+        } else if (spec.terrain === "parchment_land") {
+            height = 0.65 + jitter * 0.45;
+            topColor = new THREE.Color(0x3f6212).lerp(new THREE.Color(0x78350f), jitter * 0.55);
         } else if (spec.terrain === "reef") {
             height = 0.26;
             topColor = new THREE.Color(0x27272a);
+        } else if (spec.terrain === "archipelago") {
+            height = 0.42;
+            topColor = new THREE.Color(0x0f766e);
         } else if (spec.terrain === "mountain") {
-            height = 1.15;
+            height = 1.10 + jitter * 0.48;
+            topColor.offsetHSL(0, (jitter - 0.5) * 0.08, (jitter - 0.5) * 0.08);
         } else if (spec.terrain === "highland") {
-            height = 0.92;
+            height = 0.90 + jitter * 0.36;
+            topColor.offsetHSL(0, (jitter - 0.5) * 0.08, (jitter - 0.5) * 0.07);
+        } else if (spec.terrain === "southeast_land") {
+            height = 0.68 + jitter * 0.28;
+            topColor.offsetHSL(0, (jitter - 0.5) * 0.06, (jitter - 0.5) * 0.06);
+        } else if (spec.terrain === "coast_land") {
+            height = 0.62 + jitter * 0.26;
+            topColor.offsetHSL(0, (jitter - 0.5) * 0.06, (jitter - 0.5) * 0.06);
         } else if (spec.terrain === "delta_land") {
-            height = 0.65;
+            height = 0.54 + jitter * 0.22;
+            topColor.offsetHSL(0, (jitter - 0.5) * 0.07, (jitter - 0.5) * 0.07);
         } else if (spec.terrain === "island") {
             height = 0.44;
         } else {
@@ -541,10 +705,10 @@ class World3D {
         }
 
         const hexGeo = new THREE.CylinderGeometry(this.hexRadius * 0.96, this.hexRadius * 1.0, height, 6);
-        const isWaterHex = (spec.terrain === "sea");
+        const isWaterHex = (spec.terrain === "sea" || spec.terrain === "river_channel");
         const hexMat = new THREE.MeshStandardMaterial({
             color: topColor,
-            roughness: isWaterHex ? 0.28 : 0.68,
+            roughness: isWaterHex ? 0.28 : 0.65,
             metalness: isWaterHex ? 0.35 : 0.16,
             transparent: isWaterHex,
             opacity: isWaterHex ? 0.58 : 1.0
@@ -556,21 +720,20 @@ class World3D {
         baseMesh.castShadow = !isWaterHex;
         group.add(baseMesh);
 
-        // Subtle Hex Edge Outline (Invisible on water until hovered, subtle on land)
         const rimGeo = new THREE.RingGeometry(this.hexRadius * 0.88, this.hexRadius * 0.96, 6);
         rimGeo.rotateX(-Math.PI / 2);
         rimGeo.rotateZ(Math.PI / 6);
+        const rimColor = spec.terrain === "reef" ? new THREE.Color(0x64748b) : new THREE.Color(region.color);
         const rimMat = new THREE.MeshBasicMaterial({
-            color: spec.terrain === "reef" ? new THREE.Color(0x64748b) : new THREE.Color(region.color),
+            color: rimColor,
             transparent: true,
-            opacity: isWaterHex ? 0.05 : 0.22,
+            opacity: isWaterHex ? 0.03 : 0.22,
             side: THREE.DoubleSide
         });
         const rimMesh = new THREE.Mesh(rimGeo, rimMat);
         rimMesh.position.y = height - 0.09;
         group.add(rimMesh);
 
-        // Hover Outer Rim Highlight (ONLY lights up when hovering a reachable hex!)
         const hlGeo = new THREE.RingGeometry(this.hexRadius * 0.82, this.hexRadius * 0.97, 6);
         hlGeo.rotateX(-Math.PI / 2);
         hlGeo.rotateZ(Math.PI / 6);
@@ -587,39 +750,19 @@ class World3D {
         const surfaceY = height - 0.1;
 
         // --------------------------------------------------------------------
-        // IMPASSABLE TERRAIN 3D DIORAMA OBSTACLES
+        // RICH, UNIQUE, ANIMATED 3D DIORAMAS FOR ALL LAND & OBSTACLE HEXES
         // --------------------------------------------------------------------
         if (!spec.navigable) {
-            if (spec.terrain === "mountain" || spec.terrain === "highland") {
-                const rockMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.75 });
-                const lushMat = new THREE.MeshStandardMaterial({ color: region.color, roughness: 0.6 });
-
-                const p1 = new THREE.Mesh(new THREE.ConeGeometry(0.98, 1.95, 7), rockMat);
-                p1.position.set(-0.28, surfaceY + 0.92, -0.14);
-                p1.castShadow = true;
-                const cap1 = new THREE.Mesh(new THREE.ConeGeometry(0.82, 1.05, 7), lushMat);
-                cap1.position.set(-0.28, surfaceY + 1.25, -0.14);
-
-                const p2 = new THREE.Mesh(new THREE.ConeGeometry(0.74, 1.42, 6), rockMat);
-                p2.position.set(0.45, surfaceY + 0.68, 0.32);
-                p2.castShadow = true;
-                group.add(p1, cap1, p2);
-            } else if (spec.terrain === "delta_land") {
-                const hillMat = new THREE.MeshStandardMaterial({ color: region.accent, roughness: 0.65 });
-                const dome = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.28, 0.55, 7), hillMat);
-                dome.position.set(0, surfaceY + 0.26, 0);
-                group.add(dome);
-
-                const treeMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.55 });
-                [[-0.42, -0.28], [0.42, 0.22], [0, 0.42]].forEach(([tx, tz]) => {
-                    const tree = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.88, 7), treeMat);
-                    tree.position.set(tx, surfaceY + 0.82, tz);
-                    tree.castShadow = true;
-                    group.add(tree);
-                });
+            if (spec.terrain === "archipelago" && spec.archipelagoName) {
+                const archModel = ProceduralModels.createSovereigntyArchipelago(
+                    spec.archipelagoName,
+                    spec.archipelagoSub || "Chủ Quyền Biển Đảo Việt Nam"
+                );
+                archModel.position.y = surfaceY;
+                group.add(archModel);
             } else if (spec.terrain === "reef") {
                 const reefMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8, metalness: 0.2 });
-                const coralMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xbe123c, emissiveIntensity: 0.35 });
+                const coralMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xbe123c, emissiveIntensity: 0.38 });
                 [[-0.45, 0.14, 1.15], [0.42, -0.26, 0.88], [0.08, 0.45, 0.76]].forEach(([rx, rz, h]) => {
                     const spire = new THREE.Mesh(new THREE.ConeGeometry(0.44, h, 5), reefMat);
                     spire.position.set(rx, surfaceY + h / 2, rz);
@@ -630,7 +773,16 @@ class World3D {
                 const warnOrb = new THREE.Mesh(new THREE.OctahedronGeometry(0.20, 0), coralMat);
                 warnOrb.position.set(0, surfaceY + 1.25, 0);
                 group.add(warnOrb);
+                this.animatedLandProps.push({ type: "spin_y", mesh: warnOrb, speed: 2.0 });
+            } else {
+                // Every Mainland & Frontier Hex gets a Unique Animated 3D Diorama!
+                const landDiorama = ProceduralModels.createLandHexDiorama(spec, surfaceY, this.animatedLandProps);
+                group.add(landDiorama);
             }
+        } else if (spec.isSpawnRim) {
+            const buoy = ProceduralModels.createStartingAnchorBuoy();
+            buoy.position.y = surfaceY;
+            group.add(buoy);
         }
 
         const tileObj = {
@@ -662,7 +814,6 @@ class World3D {
 
         baseMesh.userData = { tile: tileObj };
 
-        // Add Scaled-Up 3D Monument / Trade Port / Resource Models + Floating Label
         if (spec.monumentId) {
             const monData = window.GAME_DATA.monuments.find(m => m.id === spec.monumentId);
             const tier = tileObj.monumentTier;
@@ -900,11 +1051,11 @@ class World3D {
                 shipMesh.rotation.y = startRotY + deltaAngle * Math.min(1, t * 1.65);
 
                 if (shipMesh.userData.mainSail) {
-                    const swell = 1.0 + Math.sin(t * Math.PI) * 0.14;
+                    const swell = 1.0 + Math.sin(t * Math.PI) * 0.16;
                     shipMesh.userData.mainSail.scale.set(swell, 1.0, swell);
                 }
 
-                if (Math.random() < 0.55) {
+                if (Math.random() < 0.58) {
                     this.spawnWakeParticle(shipMesh.position.x, shipMesh.position.y, shipMesh.position.z);
                 }
 
@@ -1020,7 +1171,6 @@ class World3D {
     updateReachableHighlights(reachablePathsMap, activeHexKey) {
         this.reachablePaths = reachablePathsMap;
         this.activeHexKey = activeHexKey;
-        // Keep all hex borders hidden by default; ONLY light up the hovered hex if it is reachable!
         this.hexTiles.forEach(tile => {
             if (this.hoveredHex === tile) {
                 const key = `${tile.q},${tile.r}`;
@@ -1128,6 +1278,7 @@ class World3D {
             const elapsed = this.clock.getElapsedTime();
             const now = performance.now();
 
+            // 1. Dynamic Ocean Waves
             if (this.oceanMesh) {
                 const pos = this.oceanMesh.geometry.attributes.position;
                 const amp = this.waveMultiplier || 1.0;
@@ -1141,9 +1292,10 @@ class World3D {
                 this.oceanMesh.geometry.computeVertexNormals();
             }
 
+            // 2. Clouds & Weather
             this.clouds.forEach(c => {
                 c.mesh.position.x += c.speed * delta;
-                if (c.mesh.position.x > 75) c.mesh.position.x = -75;
+                if (c.mesh.position.x > 82) c.mesh.position.x = -82;
             });
 
             if (this.rainLines && this.rainLines.visible) {
@@ -1168,28 +1320,76 @@ class World3D {
                 }
             }
 
+            // 3. Foam Rings
             this.foamRings.forEach(f => {
                 const s = 0.8 + Math.sin(elapsed * f.speed + f.offset) * 0.35;
                 f.mesh.scale.set(s, s, s);
                 f.mesh.material.opacity = 0.2 + Math.cos(elapsed * f.speed + f.offset) * 0.15;
             });
 
+            // 4. Player Ships: Pitch/Roll, Breathing Sails, Fluttering Flags & Swaying Lanterns
             let shipIdx = 0;
-            const wavePitch = (this.waveMultiplier || 1.0) * 0.05;
+            const wavePitch = (this.waveMultiplier || 1.0) * 0.048;
             this.shipMeshes.forEach((ship) => {
                 ship.rotation.z = Math.sin(elapsed * 2.2 + shipIdx) * wavePitch;
                 ship.rotation.x = Math.cos(elapsed * 1.8 + shipIdx) * (wavePitch * 0.75);
                 if (ship.userData.flag) {
-                    ship.userData.flag.rotation.y = Math.sin(elapsed * 5.5 + shipIdx) * 0.28;
+                    ship.userData.flag.rotation.y = Math.sin(elapsed * 5.8 + shipIdx) * 0.32;
+                }
+                if (ship.userData.mainSail) {
+                    const breath = 1.0 + Math.sin(elapsed * 2.6 + shipIdx) * 0.045;
+                    ship.userData.mainSail.scale.set(breath, 1.0, breath);
+                }
+                if (ship.userData.foreSail) {
+                    const breath2 = 1.0 + Math.cos(elapsed * 2.8 + shipIdx) * 0.045;
+                    ship.userData.foreSail.scale.set(breath2, 1.0, breath2);
                 }
                 shipIdx++;
             });
 
+            // 5. Animated Land Hex Diorama Props (Waterwheels, Windmills, Campfires, Cranes, Smoke, Clouds)
+            for (let i = 0; i < this.animatedLandProps.length; i++) {
+                const item = this.animatedLandProps[i];
+                if (!item.mesh) continue;
+                if (item.type === "spin_z") {
+                    item.mesh.rotation.z += (item.speed || 1.5) * delta;
+                } else if (item.type === "spin_y") {
+                    item.mesh.rotation.y += (item.speed || 1.2) * delta;
+                } else if (item.type === "orbit_cloud") {
+                    item.mesh.position.x = item.basePos.x + Math.sin(elapsed * 0.8 + item.phase) * 0.22;
+                    item.mesh.position.z = item.basePos.z + Math.cos(elapsed * 0.7 + item.phase) * 0.18;
+                } else if (item.type === "smoke_rise") {
+                    const cycle = (elapsed * 0.65 + item.phase) % 1.0;
+                    item.mesh.position.y = item.baseY + cycle * 0.55;
+                    const sc = 0.65 + cycle * 0.75;
+                    item.mesh.scale.setScalar(sc);
+                } else if (item.type === "sway_flag") {
+                    item.mesh.rotation.y = Math.sin(elapsed * 3.5 + item.phase) * 0.25;
+                } else if (item.type === "flicker_fire") {
+                    const sc = 0.85 + Math.sin(elapsed * 11.0 + item.phase) * 0.22;
+                    item.mesh.scale.set(sc, sc * 1.25, sc);
+                    item.mesh.rotation.y += 2.2 * delta;
+                } else if (item.type === "bob_boat") {
+                    item.mesh.position.y = item.baseY + Math.sin(elapsed * 2.4 + item.phase) * 0.03;
+                    item.mesh.rotation.z = Math.sin(elapsed * 2.0 + item.phase) * 0.06;
+                } else if (item.type === "shimmer_water") {
+                    const pulse = 0.92 + Math.sin(elapsed * 5.0 + item.phase) * 0.10;
+                    item.mesh.scale.set(pulse, 1.0, 1.0);
+                }
+            }
+
+            // 6. Monument, Port & Resource Model Animations
             this.hexTiles.forEach(tile => {
                 if (tile.propModel) {
                     if (tile.monumentId && tile.propModel.userData.relicCrown) {
                         tile.propModel.userData.relicCrown.rotation.y = elapsed * 1.8;
                         tile.propModel.userData.relicCrown.position.y = 2.15 + Math.sin(elapsed * 2.5) * 0.10;
+                    }
+                    if (tile.propModel.userData.spinZ) {
+                        tile.propModel.userData.spinZ.rotation.z = elapsed * 2.0;
+                    }
+                    if (tile.propModel.userData.spinY) {
+                        tile.propModel.userData.spinY.rotation.y = Math.sin(elapsed * 0.9) * 0.85;
                     }
                     if (tile.hasNPC && tile.propModel.userData.gem) {
                         tile.propModel.userData.gem.rotation.y = elapsed * 2.6;
@@ -1197,6 +1397,7 @@ class World3D {
                 }
             });
 
+            // 7. Ambient Ocean Wildlife & Fleet Animations
             if (this.ambientLighthouses) {
                 this.ambientLighthouses.forEach((lh, idx) => {
                     if (lh.userData.beam) {
@@ -1225,6 +1426,23 @@ class World3D {
                     }
                 });
             }
+            if (this.ambientDolphins) {
+                this.ambientDolphins.forEach((dp, idx) => {
+                    dp.angle += dp.speed * delta;
+                    const dx = dp.centerX + Math.cos(dp.angle) * dp.radius;
+                    const dz = dp.centerZ + Math.sin(dp.angle) * dp.radius;
+                    const leapArc = Math.sin(elapsed * 2.8 + dp.jumpPhase);
+                    const yPos = Math.max(-0.35, leapArc * 1.15);
+                    dp.mesh.position.set(dx, yPos, dz);
+                    dp.mesh.rotation.y = -dp.angle - Math.PI / 2;
+                    dp.mesh.rotation.z = Math.cos(elapsed * 2.8 + dp.jumpPhase) * 0.45;
+                });
+            }
+            if (this.ambientFishSchools) {
+                this.ambientFishSchools.forEach((fs) => {
+                    fs.mesh.rotation.y += fs.speed * delta;
+                });
+            }
             if (this.ambientSeagulls) {
                 this.ambientSeagulls.forEach((sg, idx) => {
                     sg.angle += sg.speed * delta;
@@ -1232,9 +1450,17 @@ class World3D {
                     const gz = Math.sin(sg.angle) * sg.radius;
                     sg.mesh.position.set(gx, sg.height + Math.sin(elapsed * 2.5 + idx) * 0.4, gz);
                     sg.mesh.rotation.y = -sg.angle - Math.PI / 2;
+                    if (sg.mesh.userData.wings) {
+                        const flap = Math.sin(elapsed * 7.5 + idx) * 0.38;
+                        sg.mesh.userData.wings.forEach(w => {
+                            w.wingL.rotation.z = flap;
+                            w.wingR.rotation.z = -flap;
+                        });
+                    }
                 });
             }
 
+            // 8. Wake & Burst Particle Effects
             for (let i = this.floatingEffects.length - 1; i >= 0; i--) {
                 const fx = this.floatingEffects[i];
                 const age = now - fx.birth;

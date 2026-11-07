@@ -33,6 +33,9 @@
             <div id="hud-round" class="hud-pill round-pill">Vòng 1</div>
             <div id="hud-my-ship" class="hud-pill ship-pill">Thuyền của bạn: --</div>
             <div id="hud-turn-status" class="hud-pill turn-pill my-turn">Lượt của bạn</div>
+            <button id="spectator-quiz-toggle-pill" class="hud-pill quiz-toggle-pill hidden" onclick="window.GAME.toggleSpectatorQuizModal()">
+                👁️ Xem Đáp Án Quiz
+            </button>
             <div id="room-code-pill" class="hud-pill room-pill hidden" title="Nhấn để mở Phòng Chờ">Phòng: ----</div>
         </div>
 
@@ -44,8 +47,8 @@
                 <option value="rain">🌧️ Mưa biển</option>
                 <option value="storm">⛈️ Giông bão</option>
             </select>
-            <button id="btn-open-market" class="hud-icon-btn" title="Chợ Hàng Hải">
-                ⚖️ Chợ (<span id="market-count-badge">3</span>)
+            <button id="btn-open-market" class="hud-icon-btn market-always-btn" title="Chợ Hàng Hải (Giao dịch tự do mọi lượt - 0 AP)">
+                ⚖️ Chợ Tự Do (<span id="market-count-badge">3</span>)
             </button>
             <button id="btn-open-atlas" class="hud-icon-btn" title="Cẩm nang 6 Vùng & Di tích">🗺️ Cẩm nang</button>
             <button id="btn-open-rules" class="hud-icon-btn" title="Luật chơi">📜 Luật</button>
@@ -56,22 +59,51 @@
         </div>
     </header>
 
-    <!-- LEFT MINI PANEL: COMPACT PLAYER ROSTER -->
+    <!-- 10-SECOND PRE-GAME COUNTDOWN BANNER (BEFORE TURN-ORDER QUIZ) -->
+    <div id="pregame-countdown-banner" class="pregame-countdown-banner hidden">
+        <div class="pregame-countdown-card">
+            <div class="pregame-badge">🌊 CHUẨN BỊ KHỞI HÀNH TRÊN BẢN ĐỒ CHỮ S VIỆT NAM</div>
+            <h2>Trò Chơi Sẽ Bắt Đầu Trong <span id="pregame-countdown-sec">10</span>s</h2>
+            <p>Hãy quan sát vị trí thuyền của bạn trên bản đồ! Sau khi đếm ngược kết thúc, tất cả người chơi sẽ cùng trả lời <strong>1 Câu Hỏi Địa Lý</strong> để xếp thứ tự lượt chơi (Ai trả lời đúng &amp; nhanh nhất xuất phát đầu tiên).</p>
+            <div class="pregame-progress-track">
+                <div id="pregame-progress-bar" class="pregame-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LEFT MINI PANEL: COMPACT & DRAGGABLE PLAYER ROSTER + LIVE TRADE BULLETIN -->
     <aside id="left-hud-panel" class="left-hud-panel hidden-hud">
         <div id="panel-roster" class="hud-card">
-            <div class="hud-card-header" onclick="window.GAME.togglePanel('panel-roster')">
-                <span class="hud-card-title-text">Hải Đội Trong Trận (Đạt 3 👑 = Thắng)</span>
-                <button class="panel-collapse-btn">－</button>
+            <div class="hud-card-header draggable-handle" data-drag-target="left-hud-panel">
+                <span class="hud-card-title-text" title="Kéo thanh tiêu đề để di chuyển cửa sổ">⠿ Hải Đội (3 👑 = Thắng)</span>
+                <button class="panel-collapse-btn" onclick="event.stopPropagation(); window.GAME.togglePanel('panel-roster')">－</button>
             </div>
             <div class="hud-card-body">
                 <div id="fleet-roster"></div>
             </div>
         </div>
 
+        <!-- LIVE TRADE BULLETIN BOARD (BẢNG TIN GIAO THƯƠNG ĐANG CÓ HIỆN TẠI) -->
+        <div id="panel-trade-bulletin" class="hud-card">
+            <div class="hud-card-header draggable-handle" data-drag-target="left-hud-panel">
+                <span class="hud-card-title-text" title="Kéo thanh tiêu đề để di chuyển cửa sổ">
+                    📢 Bảng Tin Giao Thương (<span id="bulletin-count-badge">0</span>)
+                </span>
+                <div style="display:flex; align-items:center; gap:4px">
+                    <button class="bulletin-open-btn" onclick="event.stopPropagation(); window.GAME.openMaritimeMarketModal()" title="Mở Sàn Giao Thương Chung (0 AP)">+ Chợ</button>
+                    <button class="panel-collapse-btn" onclick="event.stopPropagation(); window.GAME.togglePanel('panel-trade-bulletin')">－</button>
+                </div>
+            </div>
+            <div class="hud-card-body">
+                <div id="trade-bulletin-listings" class="trade-bulletin-list"></div>
+                <div id="trade-bulletin-news" class="trade-bulletin-news"></div>
+            </div>
+        </div>
+
         <div id="panel-log" class="hud-card collapsed">
-            <div class="hud-card-header" onclick="window.GAME.togglePanel('panel-log')">
-                <span class="hud-card-title-text">Nhật Ký Hải Trình</span>
-                <button class="panel-collapse-btn">＋</button>
+            <div class="hud-card-header draggable-handle" data-drag-target="left-hud-panel">
+                <span class="hud-card-title-text" title="Kéo thanh tiêu đề để di chuyển cửa sổ">⠿ Nhật Ký Hải Trình</span>
+                <button class="panel-collapse-btn" onclick="event.stopPropagation(); window.GAME.togglePanel('panel-log')">＋</button>
             </div>
             <div class="hud-card-body">
                 <div id="game-log-list" class="log-list"></div>
@@ -79,25 +111,28 @@
         </div>
     </aside>
 
-    <!-- RIGHT COMPACT PANEL: CAPTAIN CONTROL DOCK -->
+    <!-- RIGHT COMPACT PANEL: ALWAYS SHOWS YOUR OWN SHIP INFO (DRAGGABLE) -->
     <aside id="right-hud-panel" class="right-hud-panel hidden-hud">
         <div id="panel-captain" class="hud-card">
-            <div class="hud-card-header" onclick="window.GAME.togglePanel('panel-captain')">
+            <div class="hud-card-header draggable-handle" data-drag-target="right-hud-panel">
                 <div class="captain-header-inline">
                     <span id="active-player-dot" class="captain-dot"></span>
                     <div>
-                        <div id="active-player-name" class="captain-name">Thuyền Trưởng</div>
+                        <div id="active-player-name" class="captain-name">Thuyền Của Bạn</div>
                         <div id="active-player-vessel" class="captain-vessel">Chiến thuyền</div>
                     </div>
                 </div>
-                <button class="panel-collapse-btn">－</button>
+                <button class="panel-collapse-btn" onclick="event.stopPropagation(); window.GAME.togglePanel('panel-captain')">－</button>
             </div>
 
             <div class="hud-card-body">
-                <!-- Clean 4-Metric Bar -->
+                <!-- Live Turn Indicator Banner when another player is taking their turn -->
+                <div id="spectator-active-turn-banner" class="spectator-turn-strip hidden"></div>
+
+                <!-- Clean 4-Metric Bar (ALWAYS YOUR OWN SHIP'S STATS!) -->
                 <div class="stats-compact-grid">
                     <div class="stat-box">
-                        <span class="stat-label">Hành động</span>
+                        <span class="stat-label">Điểm hành động</span>
                         <strong id="stat-ap" class="stat-val accent-sky">4 / 4 AP</strong>
                         <small id="stat-move-steps" class="stat-sub">Tối đa 6 ô (3 AP)</small>
                     </div>
@@ -107,22 +142,22 @@
                         <small class="stat-sub">Đóng tàu / Sửa</small>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Ngân khố</span>
+                        <span class="stat-label">Ngân khố của bạn</span>
                         <strong id="stat-coins" class="stat-val accent-amber">1 / 10 🪙</strong>
                         <small id="stat-cargo" class="stat-sub">Khoang: 2/8</small>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Bảo vật</span>
+                        <span class="stat-label">Bảo vật của bạn</span>
                         <strong id="stat-relics" class="stat-val accent-emerald">0 / 3 👑</strong>
                         <small class="stat-sub">Mục tiêu thắng</small>
                     </div>
                 </div>
 
-                <!-- 6 Core Resources & Keys Strip -->
+                <!-- 6 Core Resources & Keys Strip (ALWAYS YOUR OWN INVENTORY!) -->
                 <div class="inventory-strip">
-                    <div class="inv-cell" title="Lương thực">🌾 Lúa <span id="inv-food">1</span></div>
-                    <div class="inv-cell" title="Gỗ đóng tàu">🌲 Gỗ <span id="inv-wood">1</span></div>
-                    <div class="inv-cell" title="Quặng sắt">⛏️ Sắt <span id="inv-iron">0</span></div>
+                    <div class="inv-cell" title="Lương thực của bạn">🌾 Lúa <span id="inv-food">1</span></div>
+                    <div class="inv-cell" title="Gỗ đóng tàu của bạn">🌲 Gỗ <span id="inv-wood">1</span></div>
+                    <div class="inv-cell" title="Quặng sắt của bạn">⛏️ Sắt <span id="inv-iron">0</span></div>
                     <div class="inv-cell" title="Chìa khóa Cấp 1 (Dễ)">🗝️ K1 <span id="inv-k1">0</span></div>
                     <div class="inv-cell" title="Chìa khóa Cấp 2 (Vừa)">🗝️ K2 <span id="inv-k2">0</span></div>
                     <div class="inv-cell" title="Chìa khóa Cấp 3 (Khó)">🗝️ K3 <span id="inv-k3">0</span></div>
