@@ -2309,7 +2309,21 @@ class GoldenJourneyGame {
     // DOUBLE-CLICK + HOLD-DRAG MANUAL PATH DRAWING (STEER AROUND REEFS!)
     // ------------------------------------------------------------------------
     startCustomPathDrag(firstTile) {
-        if (!this.isGameStarted || this.isBusy || !this.isMyTurn()) return false;
+        if (!this.isGameStarted || this.isBusy) return false;
+        if (this.isPreGameCountingDown || this.roomState.status === "turn_order_quiz") {
+            const modalEl = document.getElementById("modal-overlay");
+            if (modalEl && !modalEl.classList.contains("hidden")) {
+                return false;
+            }
+            if (this.preGameCountdownTimer) {
+                clearInterval(this.preGameCountdownTimer);
+                this.preGameCountdownTimer = null;
+            }
+            this.isPreGameCountingDown = false;
+            this.roomState.status = "playing";
+        }
+        if (!this.isMyTurn()) return false;
+
         const p = this.getActivePlayer();
         if (!p || !firstTile || !firstTile.navigable) return false;
         if (firstTile.stormRestricted && !this.sandboxInfiniteMove) {
@@ -2323,20 +2337,24 @@ class GoldenJourneyGame {
             return false;
         }
 
-        const distFromShip = this.hexDistance(p.q, p.r, firstTile.q, firstTile.r);
-        if (distFromShip > 1) {
-            this.showToast("✏️ Để tự vẽ đường đi: Hãy nhấp đúp (2 lần) và giữ chuột từ ô thuyền đang đứng hoặc ô ngay sát cạnh thuyền rồi kéo qua từng ô!");
-            return false;
-        }
-
         this.customDrawnPath = [];
+        const distFromShip = this.hexDistance(p.q, p.r, firstTile.q, firstTile.r);
+
         if (distFromShip === 1) {
             this.customDrawnPath.push(firstTile);
+        } else if (distFromShip > 1) {
+            const navInfo = this.getNavigablePathTo(p, firstTile.q, firstTile.r);
+            if (navInfo && navInfo.path && navInfo.path.length <= maxSteps) {
+                this.customDrawnPath.push(...navInfo.path);
+            } else {
+                this.showToast("✏️ Hãy nhấp đúp (2 lần) hoặc giữ kéo từ ô thuyền đang đứng / ô kế bên để vẽ đường đi!");
+                return false;
+            }
         }
 
         const startTile = this.getCurrentTile(p);
-        this.world.showPathPreview(startTile ? [startTile, ...this.customDrawnPath] : [...this.customDrawnPath]);
-        this.showToast(`✏️ Đang vẽ đường đi thủ công (${this.customDrawnPath.length}/${maxSteps} ô) — Kéo chuột qua từng ô nước để né Đá Ngầm rồi thả chuột!`);
+        this.world.showPathPreview(startTile ? [startTile, ...this.customDrawnPath] : [...this.customDrawnPath], true);
+        this.showToast(`✏️ Đang tùy chỉnh đường đi (${this.customDrawnPath.length}/${maxSteps} ô) — Kéo chuột qua từng ô muốn đi rồi thả chuột!`);
         return true;
     }
 
@@ -2357,12 +2375,17 @@ class GoldenJourneyGame {
             if (prevTile.q === tile.q && prevTile.r === tile.r) {
                 this.customDrawnPath.pop();
                 const startTile = this.getCurrentTile(p);
-                this.world.showPathPreview(startTile ? [startTile, ...this.customDrawnPath] : [...this.customDrawnPath]);
+                this.world.showPathPreview(startTile ? [startTile, ...this.customDrawnPath] : [...this.customDrawnPath], true);
                 return;
             }
         } else if (this.customDrawnPath.length === 1 && tile.q === p.q && tile.r === p.r) {
             this.customDrawnPath.pop();
-            this.world.clearPathPreview();
+            const startTile = this.getCurrentTile(p);
+            if (startTile) {
+                this.world.showPathPreview([startTile], true);
+            } else {
+                this.world.clearPathPreview();
+            }
             return;
         }
 
@@ -2380,13 +2403,28 @@ class GoldenJourneyGame {
             }
         }
 
-        // Must be adjacent (distance === 1) to the last hex in the custom path and within maxSteps
+        const remainingSteps = maxSteps - this.customDrawnPath.length;
+        if (remainingSteps <= 0) return;
+
         const stepDist = this.hexDistance(lastNode.q, lastNode.r, tile.q, tile.r);
-        if (stepDist === 1 && this.customDrawnPath.length < maxSteps) {
+        if (stepDist === 1) {
             if (!this.customDrawnPath.some(t => t.q === tile.q && t.r === tile.r)) {
                 this.customDrawnPath.push(tile);
                 const startTile = this.getCurrentTile(p);
-                this.world.showPathPreview(startTile ? [startTile, ...this.customDrawnPath] : [...this.customDrawnPath]);
+                this.world.showPathPreview(startTile ? [startTile, ...this.customDrawnPath] : [...this.customDrawnPath], true);
+            }
+        } else if (stepDist > 1 && stepDist <= remainingSteps) {
+            // Smoothly bridge intermediate hexes if the user drags the mouse fast across hexes
+            const subPaths = this.computeNavigablePaths(lastNode.q, lastNode.r, remainingSteps);
+            const bridge = subPaths.get(`${tile.q},${tile.r}`);
+            if (bridge && bridge.path && bridge.path.length <= remainingSteps) {
+                for (const bt of bridge.path) {
+                    if (!this.customDrawnPath.some(t => t.q === bt.q && t.r === bt.r) && !(bt.q === p.q && bt.r === p.r)) {
+                        this.customDrawnPath.push(bt);
+                    }
+                }
+                const startTile = this.getCurrentTile(p);
+                this.world.showPathPreview(startTile ? [startTile, ...this.customDrawnPath] : [...this.customDrawnPath], true);
             }
         }
     }
@@ -3095,11 +3133,6 @@ class GoldenJourneyGame {
                         <button class="btn-trade-action" onclick="window.GAME.listResourceWithCustomPrice('iron')">📢 Bán 1 ⛏️ Sắt [Có: ${p.iron}]</button>
                     </div>
                     ${playerSpecHtml}
-                </div>
-
-                <div class="port-box" style="border-color:#5c9ead">
-                    <h3>🛒 3. Các Lô Hàng Đang Chào Bán Trên Sàn Chợ Chung (Mua Ngay Không Tốn AP)</h3>
-                    ${marketHtml}
                 </div>
             </div>
 

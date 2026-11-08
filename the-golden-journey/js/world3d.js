@@ -77,6 +77,12 @@ class World3D {
         this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.07;
+        this.controls.enablePan = false; // Panning is controlled via W A S D keys
+        this.controls.mouseButtons = {
+            LEFT: -1, // Left mouse button is reserved for selecting hexes & custom path drawing
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.ROTATE // Right mouse button rotates camera view
+        };
         this.controls.maxPolarAngle = Math.PI / 2.18;
         this.controls.minPolarAngle = Math.PI / 11;
         this.controls.minDistance = 14;
@@ -1392,24 +1398,40 @@ class World3D {
         runNextSegment();
     }
 
-    showPathPreview(pathTiles) {
+    showPathPreview(pathTiles, isCustomDrawn = false) {
         this.clearPathPreview();
         if (!pathTiles || pathTiles.length === 0) return;
 
+        const accentColor = isCustomDrawn ? 0x00f5d4 : 0xfde047;
         const points = [];
-        pathTiles.forEach(t => {
-            points.push(new THREE.Vector3(t.x, t.height + 0.26, t.z));
+        pathTiles.forEach((t, idx) => {
+            points.push(new THREE.Vector3(t.x, t.height + 0.28, t.z));
             const dot = new THREE.Mesh(
-                new THREE.SphereGeometry(0.22, 10, 10),
-                new THREE.MeshBasicMaterial({ color: 0xfde047 })
+                new THREE.SphereGeometry(isCustomDrawn ? 0.28 : 0.22, 12, 12),
+                new THREE.MeshBasicMaterial({ color: accentColor })
             );
-            dot.position.set(t.x, t.height + 0.26, t.z);
+            dot.position.set(t.x, t.height + 0.28, t.z);
             this.pathPreviewGroup.add(dot);
+
+            if (idx > 0 || isCustomDrawn) {
+                const ringGeo = new THREE.RingGeometry(this.hexRadius * 0.68, this.hexRadius * 0.88, 6);
+                ringGeo.rotateX(-Math.PI / 2);
+                ringGeo.rotateY(Math.PI / 6);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: accentColor,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: isCustomDrawn ? 0.92 : 0.65
+                });
+                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringMesh.position.set(t.x, t.height + 0.12, t.z);
+                this.pathPreviewGroup.add(ringMesh);
+            }
         });
 
         if (points.length >= 2) {
             const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-            const lineMat = new THREE.LineBasicMaterial({ color: 0xfde047, linewidth: 3 });
+            const lineMat = new THREE.LineBasicMaterial({ color: accentColor, linewidth: 3 });
             const line = new THREE.Line(lineGeo, lineMat);
             this.pathPreviewGroup.add(line);
         }
@@ -1685,9 +1707,41 @@ class World3D {
         });
 
         let pointerDownPos = { x: 0, y: 0 };
+        let pointerDownTile = null;
+        let isLeftPointerDown = false;
         let lastTapTime = 0;
         let lastTapTileKey = null;
+        this.singleClickTimer = null;
         this.isDrawingCustomPath = false;
+        this.isClickDrawMode = false;
+        this.hasDraggedToOtherHex = false;
+
+        // Prevent context menu on right-click so right-click smoothly rotates the 3D camera
+        this.renderer.domElement.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+        });
+
+        // W A S D (and Arrow keys) camera panning state
+        this.keyState = { w: false, a: false, s: false, d: false };
+        const updateKeyState = (e, isDown) => {
+            if (isDown && e.target) {
+                const tag = (e.target.tagName || "").toUpperCase();
+                if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.target.isContentEditable) {
+                    return;
+                }
+            }
+            const code = e.code || "";
+            const key = (e.key || "").toLowerCase();
+            if (code === "KeyW" || key === "w" || code === "ArrowUp") this.keyState.w = isDown;
+            if (code === "KeyS" || key === "s" || code === "ArrowDown") this.keyState.s = isDown;
+            if (code === "KeyA" || key === "a" || code === "ArrowLeft") this.keyState.a = isDown;
+            if (code === "KeyD" || key === "d" || code === "ArrowRight") this.keyState.d = isDown;
+        };
+        window.addEventListener("keydown", (e) => updateKeyState(e, true));
+        window.addEventListener("keyup", (e) => updateKeyState(e, false));
+        window.addEventListener("blur", () => {
+            this.keyState = { w: false, a: false, s: false, d: false };
+        });
 
         const pickTileAtClientPos = (clientX, clientY) => {
             const rect = this.renderer.domElement.getBoundingClientRect();
@@ -1720,18 +1774,43 @@ class World3D {
         };
 
         this.renderer.domElement.addEventListener("pointerdown", (e) => {
+            // Only Left-Click (button === 0) interacts with hexes & custom path drawing; Right-Click rotates camera!
+            if (e.button !== 0) return;
+
             pointerDownPos = { x: e.clientX, y: e.clientY };
             const tile = pickTileAtClientPos(e.clientX, e.clientY);
+            pointerDownTile = tile;
+            isLeftPointerDown = true;
             const now = performance.now();
+
+            // If already in Click-Draw mode (from a double-click without hold), clicking commits the drawn path!
+            if (this.isClickDrawMode) {
+                this.isClickDrawMode = false;
+                this.isDrawingCustomPath = false;
+                if (tile && tile.navigable && this.onCustomPathStep) {
+                    this.onCustomPathStep(tile);
+                }
+                if (this.onCustomPathCommit) {
+                    this.onCustomPathCommit();
+                }
+                lastTapTime = 0;
+                lastTapTileKey = null;
+                return;
+            }
 
             if (tile && tile.navigable) {
                 const tKey = `${tile.q},${tile.r}`;
                 // Double-click + Hold on the 2nd click enters Manual Drag-Path Mode!
-                if (lastTapTileKey === tKey && (now - lastTapTime) <= 600 && this.onCustomPathStart) {
+                if ((now - lastTapTime) <= 680 && this.onCustomPathStart) {
+                    clearTimeout(this.singleClickTimer);
+                    this.singleClickTimer = null;
                     const started = this.onCustomPathStart(tile);
                     if (started) {
                         this.isDrawingCustomPath = true;
-                        this.controls.enabled = false;
+                        this.hasDraggedToOtherHex = false;
+                        try {
+                            this.renderer.domElement.setPointerCapture(e.pointerId);
+                        } catch (_) {}
                         lastTapTime = 0;
                         lastTapTileKey = null;
                         return;
@@ -1745,12 +1824,33 @@ class World3D {
         this.renderer.domElement.addEventListener("pointermove", (e) => {
             const tile = pickTileAtClientPos(e.clientX, e.clientY);
 
-            // If currently holding & dragging a custom manual path, append adjacent hexes live!
-            if (this.isDrawingCustomPath) {
+            // If currently holding & dragging a custom manual path (or in click-draw mode), append adjacent hexes live!
+            if (this.isDrawingCustomPath || this.isClickDrawMode) {
                 if (tile && tile.navigable && this.onCustomPathStep) {
+                    if (pointerDownTile && (tile.q !== pointerDownTile.q || tile.r !== pointerDownTile.r)) {
+                        this.hasDraggedToOtherHex = true;
+                    }
                     this.onCustomPathStep(tile);
                 }
                 return;
+            }
+
+            // Also allow direct Left-Click Hold + Drag across hexes to start custom path drawing automatically!
+            if (isLeftPointerDown && pointerDownTile && pointerDownTile.navigable && tile && tile.navigable) {
+                const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+                if ((tile.q !== pointerDownTile.q || tile.r !== pointerDownTile.r) && moveDist > 14 && this.onCustomPathStart) {
+                    clearTimeout(this.singleClickTimer);
+                    this.singleClickTimer = null;
+                    const started = this.onCustomPathStart(pointerDownTile);
+                    if (started) {
+                        this.isDrawingCustomPath = true;
+                        this.hasDraggedToOtherHex = true;
+                        if (this.onCustomPathStep) {
+                            this.onCustomPathStep(tile);
+                        }
+                        return;
+                    }
+                }
             }
 
             if (tile) {
@@ -1767,7 +1867,7 @@ class World3D {
                     if (isReachable) {
                         tile.highlightRing.material.color.setHex(0x00f5d4);
                         tile.highlightRing.material.opacity = 0.95;
-                        this.showPathPreview(this.reachablePaths.get(key).path);
+                        this.showPathPreview(this.reachablePaths.get(key).path, false);
                     } else {
                         tile.highlightRing.material.opacity = 0.0;
                         this.clearPathPreview();
@@ -1780,18 +1880,29 @@ class World3D {
                     this.hoveredHex.highlightRing.material.opacity = 0.0;
                 }
                 this.hoveredHex = null;
-                this.renderer.domElement.style.cursor = "grab";
+                this.renderer.domElement.style.cursor = "default";
                 this.clearPathPreview();
                 if (this.onHexHover) this.onHexHover(null, 0, 0);
             }
         });
 
         this.renderer.domElement.addEventListener("pointerup", (e) => {
+            if (e.button !== 0) return;
+            isLeftPointerDown = false;
+            try {
+                this.renderer.domElement.releasePointerCapture(e.pointerId);
+            } catch (_) {}
+
             if (this.isDrawingCustomPath) {
                 this.isDrawingCustomPath = false;
-                this.controls.enabled = true;
-                if (this.onCustomPathCommit) {
-                    this.onCustomPathCommit();
+                if (this.hasDraggedToOtherHex) {
+                    this.isClickDrawMode = false;
+                    if (this.onCustomPathCommit) {
+                        this.onCustomPathCommit();
+                    }
+                } else {
+                    // User double-clicked and released immediately -> stay in Click-Draw mode so moving mouse traces hexes and next click commits!
+                    this.isClickDrawMode = true;
                 }
                 return;
             }
@@ -1802,7 +1913,14 @@ class World3D {
 
             const tile = pickTileAtClientPos(e.clientX, e.clientY);
             if (tile && this.onHexClick) {
-                this.onHexClick(tile);
+                clearTimeout(this.singleClickTimer);
+                // Delay single-click auto-move by 240ms so a 2nd click (double-click!) can cancel it and start custom path drawing!
+                this.singleClickTimer = setTimeout(() => {
+                    this.singleClickTimer = null;
+                    if (!this.isDrawingCustomPath && !this.isClickDrawMode) {
+                        this.onHexClick(tile);
+                    }
+                }, 240);
             }
         });
     }
@@ -2078,6 +2196,28 @@ class World3D {
                     }
                     fx.mesh.rotation.x += 0.18;
                     fx.mesh.rotation.z += 0.15;
+                }
+            }
+
+            // 8.5. WASD / Arrow Keys Camera Panning (Moves view up/down/left/right across the map!)
+            if (this.keyState && (this.keyState.w || this.keyState.s || this.keyState.a || this.keyState.d)) {
+                const moveF = (this.keyState.w ? 1 : 0) - (this.keyState.s ? 1 : 0);
+                const moveR = (this.keyState.d ? 1 : 0) - (this.keyState.a ? 1 : 0);
+                if (moveF !== 0 || moveR !== 0) {
+                    const fx = this.controls.target.x - this.camera.position.x;
+                    const fz = this.controls.target.z - this.camera.position.z;
+                    const fLen = Math.hypot(fx, fz) || 1;
+                    const dirX = fx / fLen;
+                    const dirZ = fz / fLen;
+                    const rightX = -dirZ;
+                    const rightZ = dirX;
+                    const panSpeed = 42 * delta;
+                    const dx = (dirX * moveF + rightX * moveR) * panSpeed;
+                    const dz = (dirZ * moveF + rightZ * moveR) * panSpeed;
+                    this.controls.target.x = Math.max(-75, Math.min(75, this.controls.target.x + dx));
+                    this.controls.target.z = Math.max(-75, Math.min(75, this.controls.target.z + dz));
+                    this.camera.position.x += dx;
+                    this.camera.position.z += dz;
                 }
             }
 
