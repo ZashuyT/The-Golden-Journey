@@ -132,73 +132,158 @@ class ProceduralModels {
     }
 
     // ------------------------------------------------------------------------
-    // B. PLAYER SHIP NAMEPLATE (DARK NEON-CRESTED CAPTAIN PILL + POINTER STEM)
     // ------------------------------------------------------------------------
-    static createPlayerShipNameplate(playerName, vesselTitle, shipColorHex = "#38bdf8") {
+    // B. PLAYER SHIP NAMEPLATE (FRAMED, HIGH-CONTRAST COLOR BADGE — NAME ONLY!)
+    //    Displays ONLY the player's name in a bold color-coded frame
+    // ------------------------------------------------------------------------
+    static createPlayerShipNameplate(playerName, vesselTitle = "", shipColorHex = "#38bdf8", isLocalPlayer = false) {
+        const cleanName = String(playerName || "Thuyền Trưởng").trim().slice(0, 18);
         const canvas = document.createElement("canvas");
         canvas.width = 560;
-        canvas.height = 190;
+        canvas.height = 160;
         const ctx = canvas.getContext("2d");
 
-        const pillX = 24, pillY = 16, pillW = 512, pillH = 124, radius = 62;
+        const pillX = 28, pillY = 14, pillW = 504, pillH = 96, radius = 24;
 
+        // Outer drop shadow / glow
+        ctx.save();
+        ctx.shadowColor = isLocalPlayer ? "rgba(250, 204, 21, 0.95)" : "rgba(0, 0, 0, 0.85)";
+        ctx.shadowBlur = isLocalPlayer ? 18 : 14;
+        ctx.shadowOffsetY = 4;
+
+        // Downward pointer triangle pointing directly at the ship
         ctx.beginPath();
-        ctx.moveTo(280 - 22, pillY + pillH - 2);
-        ctx.lineTo(280 + 22, pillY + pillH - 2);
+        ctx.moveTo(280 - 24, pillY + pillH - 2);
+        ctx.lineTo(280 + 24, pillY + pillH - 2);
         ctx.lineTo(280, pillY + pillH + 34);
         ctx.closePath();
-        ctx.fillStyle = shipColorHex;
+        ctx.fillStyle = isLocalPlayer ? "#fde047" : shipColorHex;
         ctx.fill();
 
+        // Framed Rectangular Pill Box
         ctx.beginPath();
         ctx.roundRect(pillX, pillY, pillW, pillH, radius);
         const bgGrad = ctx.createLinearGradient(pillX, pillY, pillX, pillY + pillH);
-        bgGrad.addColorStop(0, "rgba(7, 14, 28, 0.97)");
-        bgGrad.addColorStop(1, "rgba(15, 23, 42, 0.97)");
+        if (isLocalPlayer) {
+            bgGrad.addColorStop(0, "rgba(6, 46, 34, 0.98)");
+            bgGrad.addColorStop(1, "rgba(4, 28, 22, 0.98)");
+        } else {
+            bgGrad.addColorStop(0, "rgba(8, 15, 32, 0.96)");
+            bgGrad.addColorStop(1, "rgba(15, 25, 48, 0.96)");
+        }
         ctx.fillStyle = bgGrad;
         ctx.fill();
-        ctx.lineWidth = 7;
-        ctx.strokeStyle = shipColorHex;
+        ctx.restore();
+
+        // Thick Vibrant Color Frame
+        ctx.beginPath();
+        ctx.roundRect(pillX, pillY, pillW, pillH, radius);
+        ctx.lineWidth = isLocalPlayer ? 10 : 8;
+        ctx.strokeStyle = isLocalPlayer ? "#fde047" : shipColorHex;
         ctx.stroke();
 
-        const cx = pillX + 64, cy = pillY + pillH / 2;
+        // Inner Crisp Accent Rim
         ctx.beginPath();
-        ctx.arc(cx, cy, 44, 0, Math.PI * 2);
+        ctx.roundRect(pillX + 8, pillY + 8, pillW - 16, pillH - 16, radius - 6);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = isLocalPlayer ? "rgba(52, 211, 153, 0.9)" : "rgba(255, 255, 255, 0.65)";
+        ctx.stroke();
+
+        // Left Color Dot Badge
+        const dotX = pillX + 48, dotY = pillY + pillH / 2;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 21, 0, Math.PI * 2);
         ctx.fillStyle = shipColorHex;
         ctx.fill();
         ctx.lineWidth = 4;
-        ctx.strokeStyle = "#ffffff";
+        ctx.strokeStyle = isLocalPlayer ? "#fde047" : "#ffffff";
         ctx.stroke();
 
-        ctx.fillStyle = "#0f172a";
-        ctx.font = "bold 40px 'Segoe UI Emoji', sans-serif";
+        // Player Name ONLY — Bold, Huge, Crystal Clear
+        ctx.fillStyle = isLocalPlayer ? "#fef08a" : "#ffffff";
+        ctx.font = "900 42px 'Segoe UI', Roboto, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("⛵", cx, cy + 2);
-
-        const textX = pillX + 126;
-        ctx.textAlign = "left";
-        ctx.fillStyle = shipColorHex;
-        ctx.font = "900 18px 'Segoe UI', Roboto, sans-serif";
-        ctx.fillText("👑 HẢI ĐỘI NGƯỜI CHƠI", textX, pillY + 34);
-
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "900 34px 'Segoe UI', Roboto, sans-serif";
-        const cleanName = String(playerName || "Thuyền Trưởng").slice(0, 18);
-        ctx.fillText(cleanName, textX, pillY + 72);
-
-        ctx.fillStyle = "#cbd5e1";
-        ctx.font = "bold 20px 'Segoe UI', Roboto, sans-serif";
-        const cleanVessel = String(vesselTitle || "").slice(0, 28);
-        ctx.fillText(cleanVessel, textX, pillY + 103);
+        ctx.shadowColor = "rgba(0, 0, 0, 0.92)";
+        ctx.shadowBlur = 6;
+        ctx.fillText(cleanName, 298, pillY + pillH / 2 + 2);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.needsUpdate = true;
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
         const sprite = new THREE.Sprite(spriteMat);
-        sprite.scale.set(3.45, 1.16, 1);
-        sprite.renderOrder = 1010;
+        sprite.scale.set(isLocalPlayer ? 3.55 : 3.25, isLocalPlayer ? 1.02 : 0.92, 1);
+        sprite.renderOrder = isLocalPlayer ? 1018 : 1010;
         return sprite;
+    }
+
+    // ------------------------------------------------------------------------
+    // B2. LOCAL PLAYER 3D ARROW MARKER (ONLY VISIBLE ON YOUR OWN SHIP!)
+    // ------------------------------------------------------------------------
+    static createLocalPlayerArrowMarker(shipColorHex = "#00e676") {
+        const markerGroup = new THREE.Group();
+
+        const arrowMat = new THREE.MeshStandardMaterial({
+            color: 0xffea00,
+            emissive: 0xf59e0b,
+            emissiveIntensity: 0.95,
+            metalness: 0.45,
+            roughness: 0.15
+        });
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0x00ff88,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.95
+        });
+
+        // 3D Downward-Pointing Cone Head (Larger & Brighter)
+        const headGeo = new THREE.ConeGeometry(0.52, 0.82, 6);
+        headGeo.rotateX(Math.PI); // Point straight DOWN at the ship!
+        const headMesh = new THREE.Mesh(headGeo, arrowMat);
+        headMesh.position.y = 0;
+        markerGroup.add(headMesh);
+
+        // 3D Arrow Shaft
+        const shaftGeo = new THREE.CylinderGeometry(0.20, 0.20, 0.68, 6);
+        const shaftMesh = new THREE.Mesh(shaftGeo, arrowMat);
+        shaftMesh.position.y = 0.62;
+        markerGroup.add(shaftMesh);
+
+        // Glowing Halo Ring around the Arrow
+        const haloGeo = new THREE.RingGeometry(0.56, 0.76, 28);
+        haloGeo.rotateX(-Math.PI / 2);
+        const haloMesh = new THREE.Mesh(haloGeo, ringMat);
+        haloMesh.position.y = -0.24;
+        markerGroup.add(haloMesh);
+
+        // High-Contrast "▼ THUYỀN CỦA BẠN" Tag Above Arrow
+        const canvas = document.createElement("canvas");
+        canvas.width = 420;
+        canvas.height = 104;
+        const ctx = canvas.getContext("2d");
+        ctx.beginPath();
+        ctx.roundRect(14, 12, 392, 80, 40);
+        ctx.fillStyle = "#064e3b";
+        ctx.fill();
+        ctx.lineWidth = 8;
+        ctx.strokeStyle = "#fde047";
+        ctx.stroke();
+        ctx.fillStyle = "#fef08a";
+        ctx.font = "900 34px 'Segoe UI', Roboto, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("▼ THUYỀN CỦA BẠN", 210, 53);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        const badgeSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+        badgeSprite.scale.set(2.45, 0.62, 1);
+        badgeSprite.position.set(0, 1.34, 0);
+        badgeSprite.renderOrder = 1025;
+        markerGroup.add(badgeSprite);
+
+        markerGroup.userData = { headMesh, shaftMesh, haloMesh };
+        return markerGroup;
     }
 
     // ------------------------------------------------------------------------
@@ -264,7 +349,7 @@ class ProceduralModels {
     //    Includes Carved Dragon Prow, 2-Tier Stern Pagoda Cabin, Lanterns,
     //    3 Masts with Crow's Nests, Rigging Lines, Battened Sails & Ship Wheel
     // ------------------------------------------------------------------------
-    static createPlayerShip(archetypeId, playerName = "") {
+    static createPlayerShip(archetypeId, playerName = "", isLocalPlayer = false) {
         const arch = window.GAME_DATA.shipArchetypes[archetypeId % 5];
         const group = new THREE.Group();
 
@@ -445,32 +530,82 @@ class ProceduralModels {
         beaconOrb.position.set(0.05, 2.40, 0);
         group.add(beaconOrb);
 
-        // 5. High-Visibility Water Surface Identification Halo Ring + Bow Foam
-        const outerRingGeo = new THREE.RingGeometry(0.98, 1.22, 32);
+        // 5. High-Visibility Water Surface Identification Halo Ring + Vertical Light Beacon Pillar
+        const outerRingGeo = new THREE.RingGeometry(1.06, 1.34, 36);
         outerRingGeo.rotateX(-Math.PI / 2);
         const ring = new THREE.Mesh(
             outerRingGeo,
-            new THREE.MeshBasicMaterial({ color: hullColor, side: THREE.DoubleSide, transparent: true, opacity: 0.92 })
+            new THREE.MeshBasicMaterial({ color: hullColor, side: THREE.DoubleSide, transparent: true, opacity: 0.96 })
         );
         ring.position.y = 0.08;
         group.add(ring);
 
-        const innerDiscGeo = new THREE.CircleGeometry(0.95, 24);
+        const innerDiscGeo = new THREE.CircleGeometry(1.02, 28);
         innerDiscGeo.rotateX(-Math.PI / 2);
         const innerDisc = new THREE.Mesh(
             innerDiscGeo,
-            new THREE.MeshBasicMaterial({ color: hullColor, transparent: true, opacity: 0.25, side: THREE.DoubleSide })
+            new THREE.MeshBasicMaterial({ color: hullColor, transparent: true, opacity: 0.28, side: THREE.DoubleSide })
         );
         innerDisc.position.y = 0.06;
         group.add(innerDisc);
 
-        // 6. Floating Player Ship Nameplate
-        const nameSprite = this.createPlayerShipNameplate(playerName || arch.name, arch.vesselTitle, arch.color);
-        nameSprite.position.set(0, 3.22, 0);
+        // Soft Vertical Light Beacon Column so every ship's position is unmistakable across the entire map!
+        const pillarGeo = new THREE.CylinderGeometry(0.88, 1.12, 2.75, 24, 1, true);
+        const pillarMat = new THREE.MeshBasicMaterial({
+            color: isLocalPlayer ? 0xfde047 : hullColor,
+            transparent: true,
+            opacity: isLocalPlayer ? 0.22 : 0.14,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        const beaconPillar = new THREE.Mesh(pillarGeo, pillarMat);
+        beaconPillar.position.y = 1.42;
+        group.add(beaconPillar);
+
+        // Local Player Extra Golden-Emerald Expanding Radar Ring on the Water
+        let localRadarRing = null;
+        if (isLocalPlayer) {
+            const radarGeo = new THREE.RingGeometry(1.36, 1.58, 36);
+            radarGeo.rotateX(-Math.PI / 2);
+            localRadarRing = new THREE.Mesh(
+                radarGeo,
+                new THREE.MeshBasicMaterial({ color: 0xfde047, side: THREE.DoubleSide, transparent: true, opacity: 0.92 })
+            );
+            localRadarRing.position.y = 0.09;
+            group.add(localRadarRing);
+        }
+
+        // 6. Floating Player Ship Nameplate (Framed Name Only, with Golden Rim for Local Player)
+        const nameSprite = this.createPlayerShipNameplate(playerName || arch.name, arch.vesselTitle, arch.color, isLocalPlayer);
+        nameSprite.position.set(0, 3.16, 0);
         group.add(nameSprite);
 
-        group.scale.setScalar(1.36);
-        group.userData = { mainSail, foreSail, mizzenSail, flag, ring, lanternL, lanternR, nameSprite, archetype: arch };
+        // 7. Local Player 3D Arrow Marker (ONLY visible on your own ship!)
+        let myArrowMarker = null;
+        if (isLocalPlayer) {
+            myArrowMarker = this.createLocalPlayerArrowMarker(arch.color);
+            myArrowMarker.position.set(0, 4.55, 0);
+            group.add(myArrowMarker);
+        }
+
+        group.scale.setScalar(1.52);
+        group.userData = {
+            mainSail,
+            foreSail,
+            mizzenSail,
+            flag,
+            ring,
+            beaconPillar,
+            localRadarRing,
+            lanternL,
+            lanternR,
+            nameSprite,
+            myArrowMarker,
+            archetype: arch,
+            archetypeId: archetypeId % 5,
+            playerName: playerName || arch.name,
+            isLocalPlayer: Boolean(isLocalPlayer)
+        };
         return group;
     }
 
@@ -819,31 +954,48 @@ class ProceduralModels {
             }
 
         } else if (spec.regionId === 3) {
-            // 4. TÂY NGUYÊN (CAO NGUYÊN ĐẤT ĐỎ BAZAN)
+            // 4. TÂY NGUYÊN (CAO NGUYÊN ĐẤT ĐỎ BAZAN, ĐƯỜNG MÒN TRẮNG & NHÀ RÔNG CAO VÚT)
+            const trailMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.72 });
+            const trailSeg1 = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.04, 0.16), trailMat);
+            trailSeg1.position.set(0, 0.02, 0.08);
+            trailSeg1.rotation.y = 0.42;
+            group.add(trailSeg1);
+
             if (variant === 0) {
-                // A: Buôn Làng Nhà Dài & Lửa Trại Lễ Hội Cồng Chiêng Bậpùng
-                addHouse(-0.42, -0.22, 0.78, 0.32, 0.34, 0x78350f, 0xd97706, true, 0.35);
-                addHouse(0.42, -0.18, 0.68, 0.30, 0.32, 0x92400e, 0xb45309, true, -0.35);
+                // A: Nhà Rông Tây Nguyên Mái Cao Vút + Lửa Trại Lễ Hội Cồng Chiêng
+                const nhaRongStilts = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.24, 0.46), woodMat);
+                nhaRongStilts.position.set(-0.22, 0.12, -0.22);
+                const nhaRongRoof = new THREE.Mesh(
+                    new THREE.ConeGeometry(0.54, 1.32, 4),
+                    new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.65 })
+                );
+                nhaRongRoof.rotation.y = Math.PI / 4;
+                nhaRongRoof.scale.set(1.2, 1.0, 0.75);
+                nhaRongRoof.position.set(-0.22, 0.86, -0.22);
+                nhaRongRoof.castShadow = true;
+                group.add(nhaRongStilts, nhaRongRoof);
+
+                addHouse(0.42, -0.18, 0.64, 0.30, 0.32, 0x92400e, 0xb45309, true, -0.35);
 
                 // Central Campfire & Ceremonial Totem Pole (Cây Nêu)
                 const totem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1.15, 6), goldMat);
-                totem.position.set(0, 0.58, 0.15);
+                totem.position.set(0.05, 0.58, 0.25);
                 const flame = new THREE.Mesh(
                     new THREE.OctahedronGeometry(0.20, 0),
                     new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xef4444, emissiveIntensity: 0.95 })
                 );
-                flame.position.set(0, 0.24, 0.42);
+                flame.position.set(0.05, 0.24, 0.45);
                 group.add(totem, flame);
                 if (animRegistry) animRegistry.push({ type: "flicker_fire", mesh: flame, phase: r1 * 6.28 });
 
-                addTree(-0.55, 0.45, 1.05, "pine", 0x14532d);
-                addTree(0.55, 0.45, 0.95, "pine", 0x15803d);
+                addTree(-0.55, 0.45, 1.10, "pine", 0x14532d);
+                addTree(0.55, 0.45, 1.05, "pine", 0x15803d);
 
             } else if (variant === 1) {
-                // B: Nông Trường Cà Phê – Hồ Tiêu Đất Đỏ & Trạm Sấy Quay Tự Động
+                // B: Nông Trường Cà Phê – Hồ Tiêu Đất Đỏ & Rừng Thông Cao Nguyên
                 for (let cx = -1; cx <= 1; cx++) {
                     for (let cz = -1; cz <= 0; cz++) {
-                        addTree(cx * 0.46, cz * 0.42 - 0.15, 0.75, "banyan", 0x15803d);
+                        addTree(cx * 0.46, cz * 0.42 - 0.15, 0.85, "pine", 0x14532d);
                     }
                 }
                 const dryingYard = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.48, 0.06, 12), goldMat);
@@ -927,13 +1079,16 @@ class ProceduralModels {
             }
 
         } else {
-            // 6. ĐỒNG BẰNG SÔNG CỬU LONG (MIỀN TÂY SÔNG NƯỚC & MIỆT VƯỜN)
+            // 6. ĐỒNG BẰNG SÔNG CỬU LONG (9 NHÁNH SÔNG CỬU LONG CHẰNG CHỊT & CÙ LAO XANH)
+            const riverBranch1 = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.06, 0.36), waterMat);
+            riverBranch1.position.set(0, 0.03, 0);
+            const riverBranch2 = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.06, 0.24), waterMat);
+            riverBranch2.position.set(0.12, 0.03, 0.22);
+            riverBranch2.rotation.y = Math.PI / 3;
+            group.add(riverBranch1, riverBranch2);
+
             if (variant === 0) {
                 // A: Miệt Vườn Dừa Bến Tre + Kênh Rạch + Cầu Khỉ + Ghe Xuồng Nhấp Nhô
-                const canal = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.05, 0.42), waterMat);
-                canal.position.set(0, 0.03, 0);
-                group.add(canal);
-
                 const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.56), woodMat);
                 bridge.position.set(-0.15, 0.18, 0);
                 group.add(bridge);

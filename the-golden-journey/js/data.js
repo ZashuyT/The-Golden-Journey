@@ -13,8 +13,8 @@ window.GAME_DATA = {
             code: "TDMNBB",
             name: "Trung du & Miền núi Bắc Bộ",
             enName: "Northern Midlands & Mountains",
-            color: "#2d6a4f", // Deep Pine / Moss Slate Green
-            accent: "#1b4332",
+            color: "#2d7a36", // Lush Forest Emerald Green (matches reference map)
+            accent: "#1b5222",
             terrainDesc: "Địa hình núi cao hùng vĩ (Hoàng Liên Sơn), khối núi đá vôi Karst (Hà Giang, Cao Bằng, Hạ Long) và đồi bát úp trung du.",
             climateDesc: "Nhiệt đới ẩm gió mùa có mùa đông lạnh nhất cả nước do gió mùa Đông Bắc và độ cao địa hình.",
             strengths: "Khai thác khoáng sản số 1 cả nước (than Quảng Ninh, apatit Lào Cai, sắt Thái Nguyên), thủy điện trữ năng lớn nhất (Sơn La, Hòa Bình, Lai Châu), cây công nghiệp cận nhiệt (Chè) và du lịch sinh thái biển đảo.",
@@ -32,8 +32,8 @@ window.GAME_DATA = {
             code: "DBSH",
             name: "Đồng bằng Sông Hồng",
             enName: "Red River Delta",
-            color: "#b58328", // Antique Alluvial Ochre / Bronze Gold
-            accent: "#7f5519",
+            color: "#f5b81c", // Bright Golden Harvest Yellow (matches reference map)
+            accent: "#c98a09",
             terrainDesc: "Đồng bằng châu thổ do phù sa hệ thống sông Hồng và sông Thái Bình bồi đắp, có hệ thống đê ngăn lũ lịch sử hàng ngàn năm.",
             climateDesc: "Nhiệt đới ẩm gió mùa có mùa đông lạnh, tạo lợi thế độc nhất để phát triển vụ Đông thành vụ sản xuất chính.",
             strengths: "Trình độ thâm canh lúa nước dẫn đầu cả nước (năng suất lúa tạ/ha cao nhất), trung tâm kinh tế - tài chính - khoa học công nghệ Hà Nội - Hải Phòng - Bắc Ninh.",
@@ -51,8 +51,8 @@ window.GAME_DATA = {
             code: "BTBDHMT",
             name: "Bắc Trung Bộ & Duyên hải Miền Trung",
             enName: "North Central & Central Coast",
-            color: "#2b6f86", // Mature Maritime Slate Teal
-            accent: "#1d4e60",
+            color: "#5a7f91", // Coastal Citadel Slate Teal (matches reference map)
+            accent: "#3b5968",
             terrainDesc: "Lãnh thổ hẹp ngang, kéo dài dọc bờ biển; phía Tây là dãy Trường Sơn hùng vĩ, phía Đông là dải đồng bằng ven biển và nhiều vũng vịnh nước sâu.",
             climateDesc: "Mùa hạ có gió Phơn Tây Nam khô nóng; mùa mưa lệch về thu - đông kèm theo bão nhiệt đới từ Biển Đông.",
             strengths: "Kinh tế biển tổng hợp (hệ thống cảng nước sâu Nghi Sơn, Vũng Áng, Đà Nẵng, Dung Quất, Vân Phong, Cam Ranh; nghề cá, nghề muối Cà Ná - Sa Huỳnh) và Con đường Di sản Thế giới.",
@@ -70,8 +70,8 @@ window.GAME_DATA = {
             code: "TN",
             name: "Tây Nguyên",
             enName: "Central Highlands",
-            color: "#9c4a1a", // Deep Basalt Rust / Roasted Coffee Sienna
-            accent: "#6e320f",
+            color: "#994920", // Rich Basalt Earth Brown-Sienna (matches reference map)
+            accent: "#6b3012",
             terrainDesc: "Các cao nguyên xếp tầng bề mặt rộng lớn (Kon Tum, Pleiku, Đắk Lắk, Mơ Nông, Lâm Viên, Di Linh) phủ lớp đất đỏ bazan dày màu mỡ.",
             climateDesc: "Cận xích đạo gió mùa phân hóa hai mùa mưa - khô rõ rệt; khí hậu mát mẻ trên các cao nguyên cao.",
             strengths: "Vùng chuyên canh cây công nghiệp lâu năm lớn nhất Việt Nam (Cà phê số 1 cả nước, hồ tiêu, cao su, chè Lâm Đồng), thủy điện bậc thang và trữ lượng quặng Bô-xít hàng tỷ tấn.",
@@ -89,8 +89,8 @@ window.GAME_DATA = {
             code: "DNB",
             name: "Đông Nam Bộ",
             enName: "Southeastern Region",
-            color: "#8c3b4a", // Mature Imperial Burgundy / Terracotta Plum
-            accent: "#5e2530",
+            color: "#8a2430", // Deep Imperial Crimson-Burgundy (matches reference map)
+            accent: "#5e141d",
             terrainDesc: "Địa hình bán bình nguyên chuyển tiếp từ cao nguyên xuống đồng bằng, độ cao 20–200m, giàu đất đỏ bazan và đất xám phù sa cổ.",
             climateDesc: "Cận xích đạo nóng ẩm quanh năm, nền nhiệt cao ổn định, rất ít chịu ảnh hưởng trực tiếp của bão.",
             strengths: "Đầu tàu kinh tế số 1 Việt Nam (dẫn đầu GDP, công nghiệp công nghệ cao, xuất nhập khẩu và thu hút FDI), khai thác dầu khí thềm lục địa (Bạch Hổ, Rồng, Lan Tây) và thủ phủ cây Cao su.",
@@ -108,8 +108,8 @@ window.GAME_DATA = {
             code: "DBSCL",
             name: "Đồng bằng Sông Cửu Long",
             enName: "Mekong River Delta",
-            color: "#4d7c3f", // Rich Alluvial Olive / Paddy Sage
-            accent: "#36582b",
+            color: "#659b38", // Vibrant Alluvial Lime-Olive Green (matches reference map)
+            accent: "#446e22",
             terrainDesc: "Đồng bằng châu thổ rộng lớn nhất (~40.000 km²), địa hình thấp phẳng, mạng lưới sông Tiền - sông Hậu và kênh rạch chằng chịt.",
             climateDesc: "Cận xích đạo nóng ẩm, chế độ nước điều hòa kết hợp mùa nước nổi mang phù sa và nguồn lợi thủy sản phong phú.",
             strengths: "Vựa lúa số 1 Việt Nam (>50% sản lượng lúa và >90% xuất khẩu gạo cả nước), dẫn đầu về nuôi trồng & đánh bắt thủy sản (cá tra, tôm) và vựa trái cây nhiệt đới.",
@@ -1340,6 +1340,134 @@ window.GAME_DATA = {
             trimColor: "#ffd700",
             style: "imperial_bark",
             desc: "Thương thuyền viễn dương sắc tím ánh kim nổi bật kết nối các thương cảng quốc tế."
+        }
+    ],
+
+    // SHARED GEOGRAPHY READING PASSAGES FOR "GIÔNG BÃO" (1m30s Timer, Same Passage + Unique Question per Player!)
+    stormReadingPassages: [
+        {
+            id: "storm_passage_1",
+            title: "Quy Luật Bão Biển Đông & Phòng Chống Thiên Tai Dọc Dải Đất Hình Chữ S",
+            passage: "Biển Đông là một biển nửa kín rộng khoảng 3,447 triệu km² (trong đó vùng biển Việt Nam rộng khoảng 1 triệu km²), nằm trong vùng nhiệt đới gió mùa Đông Nam Á. Trung bình mỗi năm có từ 9 đến 10 cơn bão xuất hiện trên Biển Đông, trong đó có khoảng 3 đến 4 cơn bão đổ bộ trực tiếp vào bờ biển Việt Nam. Mùa bão ở nước ta có quy luật chậm dần từ Bắc vào Nam: vùng biển Bắc Bộ và Bắc Trung Bộ chịu ảnh hưởng mạnh nhất vào các tháng 6, 7, 8 và 9; trong khi vùng Duyên hải Miền Trung và Nam Bộ mùa bão dịch chuyển muộn hơn vào các tháng 9, 10, 11 và 12. Vùng ven biển Bắc Trung Bộ và Đồng bằng sông Hồng là nơi chịu tác động dữ dội nhất của bão kèm mưa lớn, nước dâng và lũ quét ở sườn Đông dãy Trường Sơn. Để giảm nhẹ thiệt hại do bão biển, giải pháp sinh thái bền vững nhất ở ven bờ là bảo vệ và trồng mới hệ thống rừng ngập mặn, rừng phòng hộ ven biển kết hợp củng cố đê biển và hệ thống cảnh báo sớm.",
+            questions: [
+                {
+                    q: "Theo bài đọc, trung bình mỗi năm có khoảng bao nhiêu cơn bão đổ bộ trực tiếp vào bờ biển Việt Nam?",
+                    options: [
+                        "Khoảng 3 đến 4 cơn bão trực tiếp (trên tổng số 9–10 cơn bão xuất hiện ở Biển Đông)",
+                        "Khoảng 25 đến 30 cơn bão trực tiếp mỗi tháng",
+                        "Không có cơn bão nào đổ bộ vào Việt Nam",
+                        "Chỉ có đúng 1 cơn bão duy nhất trong 10 năm"
+                    ],
+                    correct: 0,
+                    explanation: "Trung bình mỗi năm Biển Đông có 9–10 cơn bão, trong đó 3–4 cơn đổ bộ trực tiếp qua bờ biển nước ta."
+                },
+                {
+                    q: "Theo bài đọc, mùa bão dọc bờ biển Việt Nam di chuyển theo quy luật thời gian nào từ Bắc vào Nam?",
+                    options: [
+                        "Chậm dần từ Bắc vào Nam (Bắc Bộ tập trung tháng 6–9, Miền Trung & Nam Bộ muộn hơn vào tháng 9–12)",
+                        "Chậm dần từ Nam ra Bắc (Nam Bộ đón bão vào tháng 1, Bắc Bộ đón bão vào tháng 12)",
+                        "Tất cả các vùng đều chỉ có bão vào đúng tháng 1 âm lịch",
+                        "Bão chỉ xuất hiện ở vùng núi Tây Nguyên, không bao giờ xuất hiện ở ven biển"
+                    ],
+                    correct: 0,
+                    explanation: "Do sự dịch chuyển của dải hội tụ nhiệt đới, mùa bão ở Việt Nam chậm dần từ Bắc vào Nam (từ tháng 6 đến tháng 12)."
+                },
+                {
+                    q: "Theo bài đọc, vùng biển Việt Nam chiếm diện tích khoảng bao nhiêu km² trong tổng diện tích Biển Đông?",
+                    options: [
+                        "Khoảng 1 triệu km² (trên tổng diện tích khoảng 3,447 triệu km² của Biển Đông)",
+                        "Khoảng 100 km²",
+                        "Khoảng 50 triệu km²",
+                        "Bằng một nửa diện tích đất liền"
+                    ],
+                    correct: 0,
+                    explanation: "Vùng biển Việt Nam rộng khoảng 1 triệu km² trên Biển Đông (gấp khoảng 3 lần diện tích đất liền)."
+                },
+                {
+                    q: "Theo bài đọc, khu vực nào ở nước ta thường chịu tác động dữ dội nhất của bão kèm mưa lớn và nước biển dâng?",
+                    options: [
+                        "Vùng ven biển Bắc Trung Bộ và Đồng bằng sông Hồng",
+                        "Vùng núi cao Tây Bắc giáp biên giới Lào",
+                        "Vùng cao nguyên Lâm Viên ở Tây Nguyên",
+                        "Vùng nội địa sâu trong đất liền không giáp biển"
+                    ],
+                    correct: 0,
+                    explanation: "Ven biển Bắc Trung Bộ và Đồng bằng sông Hồng là hai khu vực đón bão tần suất cao và chịu thiệt hại nặng nề nhất."
+                },
+                {
+                    q: "Theo bài đọc, giải pháp sinh thái bền vững nhất để chắn sóng và bảo vệ bờ biển trước giông bão là gì?",
+                    options: [
+                        "Bảo vệ và trồng mới hệ thống rừng ngập mặn, rừng phòng hộ ven biển kết hợp củng cố đê biển",
+                        "Chặt bỏ toàn bộ cây xanh ven biển để gió thổi nhanh hơn",
+                        "Khai thác hết cát ven biển để làm sâu bờ biển",
+                        "Xây nhà cao tầng sát mép nước thay cho đê biển"
+                    ],
+                    correct: 0,
+                    explanation: "Rừng ngập mặn và rừng phòng hộ ven biển là 'bức tường xanh' tự nhiên giúp triệt tiêu năng lượng sóng bão và chống xói lở bờ biển."
+                }
+            ]
+        },
+        {
+            id: "storm_passage_2",
+            title: "Chế Độ Nước Sông Ngòi & Đặc Trưng Thủy Văn 3 Miền Việt Nam",
+            passage: "Mạng lưới sông ngòi Việt Nam dày đặc với 2.360 con sông dài trên 10 km, chảy chủ yếu theo hai hướng chính là Tây Bắc – Đông Nam và hướng vòng cung, đổ ra Biển Đông. Chế độ nước sông phụ thuộc chặt chẽ vào chế độ mưa gió mùa: mùa lũ tương ứng với mùa mưa và mùa cạn tương ứng với mùa khô. Tại Bắc Bộ, hệ thống sông Hồng có mùa lũ kéo dài từ tháng 6 đến tháng 10 (đỉnh lũ vào tháng 8) do mưa mùa hạ. Tại Duyên hải Miền Trung, sông ngòi ngắn và dốc nên lũ lên rất nhanh và đột ngột vào mùa Thu – Đông (từ tháng 9 đến tháng 12, đỉnh lũ vào tháng 10–11). Trong khi đó, hệ thống sông Mê Công (Cửu Long) ở Nam Bộ có lòng sông rộng, điều hòa bởi Biển Hồ (Campuchia) nên lũ lên và rút chậm từ tháng 7 đến tháng 11, mang lại lượng phù sa màu mỡ và nguồn thủy sản dồi dào cho Đồng bằng sông Cửu Long.",
+            questions: [
+                {
+                    q: "Theo bài đọc, cả nước Việt Nam có khoảng bao nhiêu con sông có chiều dài trên 10 km và chảy theo hai hướng chính nào?",
+                    options: [
+                        "2.360 con sông; chảy theo hai hướng chính là Tây Bắc – Đông Nam và hướng vòng cung",
+                        "Chỉ có 12 con sông; chảy hoàn toàn từ Đông sang Tây",
+                        "50.000 con sông; chảy từ Nam ra Bắc",
+                        "100 con sông; không đổ ra Biển Đông"
+                    ],
+                    correct: 0,
+                    explanation: "Địa hình Việt Nam nghiêng theo hướng Tây Bắc – Đông Nam quy định mạng lưới 2.360 con sông chảy theo hướng Tây Bắc – Đông Nam và vòng cung."
+                },
+                {
+                    q: "Theo bài đọc, vì sao sông ngòi ở khu vực Duyên hải Miền Trung thường có lũ lên rất nhanh và đột ngột?",
+                    options: [
+                        "Do địa hình hẹp ngang, dãy Trường Sơn sát biển làm sông ngòi ngắn và rất dốc, kết hợp mưa lớn tập trung vào Thu – Đông",
+                        "Do băng tuyết từ đỉnh núi tan chảy đột ngột",
+                        "Do sông ở Miền Trung dài hàng chục ngàn km",
+                        "Do không có cửa biển thoát nước"
+                    ],
+                    correct: 0,
+                    explanation: "Sông ngòi Miền Trung ngắn, độ dốc lớn, lưu vực nhỏ nên khi có mưa bão Thu – Đông nước dồn về cực nhanh gây lũ quét, lũ ống."
+                },
+                {
+                    q: "Theo bài đọc, mùa lũ trên các con sông ở Duyên hải Miền Trung diễn ra vào thời gian nào (lệch pha so với Bắc Bộ và Nam Bộ)?",
+                    options: [
+                        "Vào mùa Thu – Đông (từ tháng 9 đến tháng 12, đỉnh lũ tháng 10–11)",
+                        "Vào giữa mùa xuân (tháng 2 – tháng 3)",
+                        "Vào đầu mùa hạ (tháng 5 – tháng 6)",
+                        "Quanh năm không bao giờ có mùa lũ"
+                    ],
+                    correct: 0,
+                    explanation: "Khác với Bắc Bộ và Nam Bộ mưa vào mùa hạ, Miền Trung mưa lớn vào Thu – Đông nên mùa lũ sông ngòi ở đây rơi vào tháng 9–12."
+                },
+                {
+                    q: "Theo bài đọc, yếu tố tự nhiên nào giúp lũ trên hệ thống sông Cửu Long (Mê Công) lên êm và rút chậm hơn so với các vùng khác?",
+                    options: [
+                        "Nhờ lòng sông rộng, địa hình bằng phẳng và sự điều tiết nước tự nhiên của Biển Hồ (Tonlé Sap) ở Campuchia",
+                        "Nhờ dãy núi Hoàng Liên Sơn chắn ngang cửa sông",
+                        "Nhờ không có mưa vào mùa hạ",
+                        "Nhờ nước sông chảy ngược lên phía Bắc"
+                    ],
+                    correct: 0,
+                    explanation: "Biển Hồ (Campuchia) đóng vai trò hồ điều hòa khổng lồ giúp mùa nước nổi ở ĐBSCL lên từ từ và rút êm dịu từ tháng 7 đến tháng 11."
+                },
+                {
+                    q: "Theo bài đọc, hệ thống sông Hồng ở Bắc Bộ có mùa lũ kéo dài trong khoảng thời gian nào và đạt đỉnh lũ vào tháng mấy?",
+                    options: [
+                        "Mùa lũ từ tháng 6 đến tháng 10, đỉnh lũ cao nhất vào tháng 8",
+                        "Mùa lũ từ tháng 11 đến tháng 3 năm sau, đỉnh lũ vào tháng 1",
+                        "Mùa lũ chỉ diễn ra trong 3 ngày của tháng 12",
+                        "Sông Hồng không có mùa lũ và mùa cạn"
+                    ],
+                    correct: 0,
+                    explanation: "Trùng với mùa mưa gió mùa mùa hạ ở Bắc Bộ, sông Hồng có mùa lũ từ tháng 6–10 và đỉnh lũ rơi vào tháng 8."
+                }
+            ]
         }
     ]
 };

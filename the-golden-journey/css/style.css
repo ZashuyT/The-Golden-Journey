@@ -494,14 +494,14 @@ body, html {
 /* Left & Right Floating Panels (Compact & Freely Draggable) */
 .left-hud-panel {
     position: fixed;
-    top: 60px;
-    left: 12px;
-    width: 246px;
+    top: 56px;
+    left: 10px;
+    width: 208px;
     z-index: 12;
     display: flex;
     flex-direction: column;
     gap: 6px;
-    max-height: calc(100vh - 72px);
+    max-height: calc(100vh - 68px);
 }
 
 .right-hud-panel {
@@ -899,15 +899,54 @@ body, html {
 }
 
 .modal-card {
-    background: #0f172a;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 18px;
+    position: relative;
+    background: linear-gradient(160deg, #0b192c 0%, #112240 100%);
+    border: 2px solid rgba(56, 189, 248, 0.42);
+    border-radius: 20px;
     width: 100%;
     max-width: 780px;
     max-height: 88vh;
     overflow-y: auto;
     padding: 24px 28px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.82), 0 0 32px rgba(14, 165, 233, 0.18);
+}
+
+.modal-top-close-btn,
+.panel-top-close-btn {
+    background: linear-gradient(135deg, #f43f5e, #e11d48);
+    color: #ffffff;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(244, 63, 94, 0.45);
+    transition: transform 0.15s, filter 0.15s;
+}
+
+.modal-top-close-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 15;
+}
+
+.panel-top-close-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    border-radius: 7px;
+}
+
+.modal-top-close-btn:hover,
+.panel-top-close-btn:hover {
+    transform: scale(1.08);
+    filter: brightness(1.12);
 }
 
 .modal-header-badge {
@@ -1679,113 +1718,717 @@ body, html {
     color: #a7f3d0;
 }
 
-/* Live Trade Bulletin Board (Bảng Tin Giao Thương Hiện Tại) */
-.bulletin-open-btn {
-    background: rgba(52, 211, 153, 0.18);
-    color: #a7f3d0;
-    border: 1px solid rgba(52, 211, 153, 0.42);
-    border-radius: 6px;
-    padding: 2px 7px;
-    font-size: 10.5px;
+/* ============================================================================
+   5. V6.0 VIBRANT COLORFUL HUD, HORIZONTAL BOTTOM-RIGHT DOCK & SANDBOX PANEL
+   ============================================================================ */
+.top-hud-bar {
+    background: linear-gradient(90deg, rgba(8, 28, 54, 0.92), rgba(12, 42, 78, 0.92), rgba(8, 28, 54, 0.92));
+    border-bottom: 2px solid rgba(56, 189, 248, 0.42);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+.hud-icon-btn.sandbox-hud-btn {
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    font-weight: 800;
+    box-shadow: 0 3px 12px rgba(236, 72, 153, 0.35);
+}
+
+.hud-icon-btn.cam-lock-hud-btn {
+    background: linear-gradient(135deg, #1e293b, #334155);
+    color: #f8fafc;
+    border: 1px solid rgba(148, 163, 184, 0.45);
     font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s;
 }
 
-.bulletin-open-btn:hover {
-    background: rgba(52, 211, 153, 0.32);
+.hud-icon-btn.cam-lock-hud-btn.active-lock-btn {
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: #ffffff;
+    border-color: #fde047;
+    box-shadow: 0 3px 12px rgba(16, 185, 129, 0.45);
 }
 
-.trade-bulletin-list {
+.hud-icon-btn.minimalist-hud-btn {
+    background: linear-gradient(135deg, #1e293b, #334155);
+    color: #f8fafc;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    font-weight: 700;
+}
+
+.hud-icon-btn.minimalist-hud-btn.active-minimalist-btn {
+    background: linear-gradient(135deg, #d97706, #f59e0b);
+    color: #0f172a;
+    border-color: #fef08a;
+    font-weight: 800;
+    box-shadow: 0 3px 12px rgba(245, 158, 11, 0.45);
+}
+
+.hud-icon-btn.cloud-hud-btn {
+    background: linear-gradient(135deg, #0284c7, #38bdf8);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    font-weight: 700;
+}
+
+.hud-icon-btn.atlas-hud-btn {
+    background: linear-gradient(135deg, #0d9488, #10b981);
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.hud-icon-btn.rules-hud-btn {
+    background: linear-gradient(135deg, #d97706, #f59e0b);
+    color: #0f172a;
+    font-weight: 800;
+}
+
+.hud-icon-btn.cam-hud-btn {
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.hud-card {
+    background: linear-gradient(155deg, rgba(10, 25, 47, 0.92), rgba(17, 34, 64, 0.92));
+    border: 1.5px solid rgba(56, 189, 248, 0.38);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.52);
+    padding: 7px 9px;
+}
+
+/* Sleek Compact Leaderboard Styles (#panel-roster) */
+.compact-leaderboard-list {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    max-height: 155px;
-    overflow-y: auto;
-    padding-right: 2px;
+    gap: 4px;
 }
 
-.bulletin-item-row {
+.lb-row-card {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    background: rgba(30, 41, 59, 0.62);
-    border: 1px solid rgba(251, 191, 36, 0.25);
-    border-radius: 8px;
     padding: 5px 7px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.20);
+    cursor: pointer;
+    transition: all 0.14s ease;
 }
 
-.bulletin-item-info {
+.lb-row-card:hover {
+    background: rgba(30, 41, 59, 0.95);
+    border-color: rgba(56, 189, 248, 0.55);
+    transform: translateX(2px);
+}
+
+.lb-row-card.active-turn {
+    background: linear-gradient(90deg, rgba(2, 132, 199, 0.32), rgba(15, 23, 42, 0.85));
+    border-color: #38bdf8;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.lb-row-card.is-me {
+    border-left: 3px solid #fde047;
+}
+
+.lb-row-card.eliminated {
+    opacity: 0.42;
+    text-decoration: line-through;
+}
+
+.lb-left {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 5px;
     min-width: 0;
 }
 
-.bulletin-item-title {
-    font-size: 11.5px;
-    font-weight: 700;
-    color: #fbbf24;
+.lb-rank-badge {
+    font-size: 12px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.lb-color-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1.5px solid #ffffff;
+    flex-shrink: 0;
+}
+
+.lb-info {
+    min-width: 0;
+}
+
+.lb-name-line {
+    font-size: 11px;
+    font-weight: 800;
+    color: #f8fafc;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 108px;
 }
 
-.bulletin-item-sub {
-    font-size: 10px;
+.lb-sub-line {
+    font-size: 9.5px;
+    font-weight: 600;
     color: #cbd5e1;
+    white-space: nowrap;
 }
 
-.bulletin-buy-btn {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: #0f172a;
+.lb-relic-pill {
+    font-size: 10.5px;
+    font-weight: 900;
+    color: #fef08a;
+    background: linear-gradient(135deg, rgba(180, 83, 9, 0.78), rgba(217, 119, 6, 0.78));
+    border: 1px solid rgba(253, 224, 71, 0.55);
+    padding: 2px 6px;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+/* Mini Ultra-Compact Bottom-Right Player & Resource Dock */
+.bottom-right-hud-dock {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    top: auto;
+    z-index: 16;
+    width: auto;
+    max-width: 478px;
+}
+
+.horizontal-captain-card {
+    padding: 7px 10px;
+    border: 1.5px solid rgba(251, 191, 36, 0.55);
+    border-radius: 13px;
+    background: linear-gradient(135deg, rgba(9, 24, 48, 0.94) 0%, rgba(15, 34, 64, 0.94) 100%);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.62);
+}
+
+.horizontal-captain-card .hud-card-header {
+    padding-bottom: 4px;
+    margin-bottom: 5px;
+}
+
+.captain-header-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.captain-name {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.captain-vessel-pill {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #fde047;
+    background: rgba(251, 191, 36, 0.16);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    padding: 1px 6px;
+    border-radius: 999px;
+}
+
+.spectator-turn-strip {
+    font-size: 9.5px;
+    color: #7dd3fc;
+    background: rgba(2, 132, 199, 0.22);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    padding: 1px 6px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.horiz-main-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.horiz-stats-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.h-stat-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 7px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.h-stat-pill .h-stat-icon {
+    font-size: 13px;
+}
+
+.h-stat-pill strong {
+    display: block;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1.1;
+    color: #ffffff;
+}
+
+.h-stat-pill small {
+    display: block;
+    font-size: 8.5px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.h-stat-pill.sky-pill {
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.85), rgba(14, 165, 233, 0.72));
+    border-color: #38bdf8;
+}
+
+.h-stat-pill.rose-pill {
+    background: linear-gradient(135deg, rgba(225, 29, 72, 0.85), rgba(244, 63, 94, 0.72));
+    border-color: #fb7185;
+}
+
+.h-stat-pill.gold-pill {
+    background: linear-gradient(135deg, rgba(217, 119, 6, 0.88), rgba(245, 158, 11, 0.75));
+    border-color: #fde047;
+}
+
+.h-stat-pill.emerald-pill {
+    background: linear-gradient(135deg, rgba(5, 150, 105, 0.88), rgba(16, 185, 129, 0.75));
+    border-color: #34d399;
+}
+
+/* Compact Resource & Key Chips */
+.horiz-inventory-group {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-wrap: wrap;
+    background: rgba(7, 16, 33, 0.72);
+    padding: 3px 5px;
+    border-radius: 8px;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.h-inv-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 5px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.20);
+}
+
+.h-inv-chip span {
+    font-size: 10.5px;
+    font-weight: 900;
+    color: #fef08a;
+}
+
+.h-inv-chip.res-food { background: rgba(101, 163, 13, 0.55); border-color: #84cc16; }
+.h-inv-chip.res-wood { background: rgba(21, 128, 61, 0.55); border-color: #22c55e; }
+.h-inv-chip.res-iron { background: rgba(71, 85, 105, 0.75); border-color: #94a3b8; }
+.h-inv-chip.key-k1 { background: rgba(16, 185, 129, 0.45); border-color: #34d399; }
+.h-inv-chip.key-k2 { background: rgba(245, 158, 11, 0.48); border-color: #fbbf24; }
+.h-inv-chip.key-k3 { background: rgba(239, 68, 68, 0.48); border-color: #f87171; }
+
+/* Compact Action Buttons */
+.horiz-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.horiz-actions-group .btn-action {
+    width: auto;
+    white-space: nowrap;
+    padding: 5px 9px;
+    border-radius: 7px;
+    font-size: 10.5px;
+    font-weight: 800;
+}
+
+.btn-action.primary-action {
+    background: linear-gradient(135deg, #f59e0b, #ea580c);
+    color: #ffffff;
+    border: 1px solid #fde047;
+    box-shadow: 0 3px 10px rgba(245, 158, 11, 0.35);
+}
+
+.btn-action.repair-action {
+    background: linear-gradient(135deg, #0284c7, #2563eb);
+    color: #ffffff;
+    border: 1px solid #7dd3fc;
+}
+
+.btn-action.end-turn-action {
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: #ffffff;
+    border: 1px solid #6ee7b7;
+}
+
+.horiz-tags-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px dashed rgba(148, 163, 184, 0.22);
+}
+
+.cargo-tags-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+/* Sandbox Creative Panel (Minecraft-Style God Mode) */
+.sandbox-creative-panel {
+    position: fixed;
+    top: 62px;
+    right: 14px;
+    width: 390px;
+    max-width: calc(100vw - 28px);
+    z-index: 25;
+}
+
+.sandbox-card {
+    border: 2px solid #ec4899;
+    background: linear-gradient(155deg, rgba(24, 12, 48, 0.95), rgba(15, 23, 42, 0.96));
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.72), 0 0 24px rgba(236, 72, 153, 0.28);
+}
+
+.sandbox-toggles-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 9px;
+}
+
+.sb-toggle-btn {
+    background: rgba(30, 41, 59, 0.9);
+    color: #f8fafc;
+    border: 1.5px solid rgba(168, 85, 247, 0.55);
+    border-radius: 9px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+}
+
+.sb-toggle-btn.active {
+    background: linear-gradient(135deg, #059669, #10b981);
+    border-color: #a7f3d0;
+    color: #ffffff;
+}
+
+.sb-win-btn {
+    background: linear-gradient(135deg, #f59e0b, #e11d48);
+    color: #ffffff;
+    border: 1.5px solid #fde047;
+    border-radius: 9px;
+    padding: 8px 12px;
+    font-size: 12.5px;
+    font-weight: 900;
+    cursor: pointer;
+    text-align: center;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+}
+
+.sandbox-res-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.sb-res-box {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 9px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #e2e8f0;
+    text-align: center;
+}
+
+.sb-pm-btns {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+}
+
+.sb-pm-btns button {
+    flex: 1;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: #ffffff;
     border: none;
     border-radius: 6px;
-    padding: 4px 7px;
+    padding: 4px 2px;
+    font-size: 10.5px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.sb-pm-btns button:hover {
+    filter: brightness(1.15);
+}
+
+/* ============================================================================
+   6. V7.0 IN-GAME CLOCK & WEATHER ENGINE, YAGI RED ALERT, PORT MARKET TABS,
+      ANCHORED END-TURN BUTTON & 1-LINE LIVE SCROLLING TICKER
+   ============================================================================ */
+.hud-clock-weather-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.92));
+    border: 1.5px solid rgba(56, 189, 248, 0.55);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #f8fafc;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+}
+
+.clock-time-badge {
+    color: #fde047;
+    font-variant-numeric: tabular-nums;
+}
+
+.weather-phase-badge {
+    color: #7dd3fc;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(2, 132, 199, 0.28);
+}
+
+.port-reset-mini-badge {
+    color: #6ee7b7;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.hud-icon-btn.market-hud-btn {
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: #ffffff;
+    border: 1px solid #6ee7b7;
+    font-weight: 800;
+}
+
+/* Yagi Red Alert Banner */
+.yagi-red-alert-banner {
+    position: fixed;
+    top: 52px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 38;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(90deg, rgba(127, 29, 29, 0.95), rgba(220, 38, 38, 0.95), rgba(127, 29, 29, 0.95));
+    border: 2px solid #fca5a5;
+    border-radius: 999px;
+    padding: 6px 18px;
+    color: #ffffff;
+    font-size: 12px;
+    box-shadow: 0 0 26px rgba(239, 68, 68, 0.78);
+    animation: yagiPulse 1.3s infinite alternate;
+    pointer-events: none;
+}
+
+.yagi-siren-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #fef08a;
+    box-shadow: 0 0 12px #fef08a;
+}
+
+@keyframes yagiPulse {
+    0% { transform: translateX(-50%) scale(0.99); box-shadow: 0 0 14px rgba(239, 68, 68, 0.55); }
+    100% { transform: translateX(-50%) scale(1.02); box-shadow: 0 0 32px rgba(239, 68, 68, 0.95); }
+}
+
+/* Anchored Header Buttons in #panel-captain so End Turn is NEVER pushed out! */
+.captain-header-right-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.header-dock-btn {
+    width: auto !important;
+    padding: 4px 8px !important;
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+    border-radius: 7px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+}
+
+.horiz-actions-group {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+#btn-context-action {
+    max-width: 310px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.h-inv-chip.serpent-chip {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.68), rgba(236, 72, 153, 0.68));
+    border-color: #f9a8d4;
+    color: #fdf2f8;
+}
+
+/* 1-Line Live Weather & Port Reset Marquee Ticker Next to Bottom-Right Player Dock */
+.bottom-live-ticker-wrap {
+    position: fixed;
+    bottom: 12px;
+    right: 496px;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100vw - 516px);
+}
+
+@media (max-width: 1100px) {
+    .bottom-live-ticker-wrap {
+        right: 12px;
+        bottom: 132px;
+        max-width: calc(100vw - 24px);
+    }
+}
+
+.ticker-toggle-btn {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #fde047;
+    border: 1.5px solid rgba(251, 191, 36, 0.55);
+    border-radius: 999px;
+    padding: 5px 10px;
     font-size: 10.5px;
     font-weight: 800;
     cursor: pointer;
     white-space: nowrap;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.48);
     flex-shrink: 0;
-    transition: transform 0.12s, filter 0.12s;
 }
 
-.bulletin-buy-btn:hover {
-    filter: brightness(1.1);
-    transform: translateY(-1px);
-}
-
-.bulletin-buy-btn.own-item {
-    background: rgba(71, 85, 105, 0.85);
-    color: #e2e8f0;
-    font-weight: 600;
-}
-
-.bulletin-empty {
-    font-size: 10.5px;
-    color: #94a3b8;
-    font-style: italic;
-    padding: 4px 2px;
-}
-
-.trade-bulletin-news {
-    margin-top: 6px;
-    padding-top: 5px;
-    border-top: 1px dashed rgba(148, 163, 184, 0.22);
+.live-ticker-viewport {
+    width: 370px;
+    max-width: 44vw;
+    height: 28px;
+    background: rgba(9, 20, 40, 0.90);
+    border: 1px solid rgba(56, 189, 248, 0.42);
+    border-radius: 999px;
+    overflow: hidden;
     display: flex;
-    flex-direction: column;
-    gap: 3px;
-    max-height: 76px;
-    overflow-y: auto;
+    align-items: center;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.48);
+    transition: width 0.22s ease, opacity 0.22s ease;
 }
 
-.bulletin-news-item {
-    font-size: 10px;
-    color: #cbd5e1;
-    line-height: 1.32;
-    background: rgba(15, 23, 42, 0.55);
-    padding: 3px 6px;
-    border-radius: 5px;
-    border-left: 2px solid #38bdf8;
+.live-ticker-viewport.collapsed-ticker {
+    width: 0 !important;
+    opacity: 0;
+    border-width: 0;
+    padding: 0;
+    pointer-events: none;
 }
+
+.live-ticker-track {
+    display: inline-block;
+    white-space: nowrap;
+    padding-left: 100%;
+    font-size: 11px;
+    font-weight: 700;
+    color: #e2e8f0;
+    animation: tickerMarquee 22s linear infinite;
+}
+
+@keyframes tickerMarquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+
+/* Port Inspector Tabs & Detailed Rulebook Category Tabs */
+.port-filter-tabs,
+.rule-cat-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.port-tab-btn,
+.rule-cat-btn {
+    background: rgba(15, 23, 42, 0.85);
+    color: #cbd5e1;
+    border: 1px solid rgba(148, 163, 184, 0.32);
+    border-radius: 8px;
+    padding: 6px 11px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.14s;
+}
+
+.port-tab-btn.active,
+.rule-cat-btn.active {
+    background: linear-gradient(135deg, #0284c7, #2563eb);
+    color: #ffffff;
+    border-color: #7dd3fc;
+    box-shadow: 0 3px 10px rgba(2, 132, 199, 0.35);
+}
+
+.storm-passage-box {
+    background: linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.90));
+    border: 1.5px solid rgba(56, 189, 248, 0.48);
+    border-left: 4px solid #fbbf24;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    line-height: 1.58;
+    color: #f1f5f9;
+}
+
+
 

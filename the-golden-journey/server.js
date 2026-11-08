@@ -7,7 +7,7 @@ const { spawn } = require("child_process");
 
 const PORT = process.env.PORT || 8090;
 const ROOT = __dirname;
-const ROOMS_DB_FILE = path.join(os.tmpdir(), "tgj_rooms_db_v4.json");
+const ROOMS_DB_FILE = path.join(os.tmpdir(), "tgj_rooms_db_v5.json");
 const LIVE_URL_FILE = path.join(ROOT, "..", "LINK_ONLINE_HIEN_TAI.txt");
 
 // Prevent any unexpected socket/network error from crashing the server process
@@ -281,6 +281,9 @@ function finalizeRoomTurnOrder(room) {
     });
 
     playersWithStats.sort((a, b) => {
+        if (Boolean(a.player.isAI) !== Boolean(b.player.isAI)) {
+            return a.player.isAI ? 1 : -1;
+        }
         if (a.correct !== b.correct) {
             return a.correct ? -1 : 1;
         }
@@ -290,6 +293,9 @@ function finalizeRoomTurnOrder(room) {
     const rankings = [];
     const sortedPlayers = playersWithStats.map((item, newTurnIdx) => {
         const p = item.player;
+        if (!p.shipKey) {
+            p.shipKey = p.clientId ? `client_${p.clientId}` : `seat_${p.seatIndex ?? newTurnIdx}`;
+        }
         p.id = newTurnIdx;
         p.turnRank = newTurnIdx + 1;
         rankings.push({
@@ -299,6 +305,7 @@ function finalizeRoomTurnOrder(room) {
             color: p.color,
             isAI: p.isAI,
             clientId: p.clientId,
+            shipKey: p.shipKey,
             chosenIdx: item.chosenIdx,
             correct: item.correct,
             elapsedMs: item.elapsedMs
@@ -606,22 +613,33 @@ http.createServer(async (req, res) => {
         if (!room) return sendJSON(res, 200, { ok: false, roomClosed: true, error: "Phòng đã đóng!" });
 
         const activeSeats = room.seats.filter(s => s.type === "human" || s.type === "ai");
-        if (activeSeats.length < 2) {
+        if (activeSeats.length < 1) {
             return sendJSON(res, 400, {
                 ok: false,
-                error: "Cần tối thiểu 2 vị trí (Người chơi hoặc Bot AI) trong phòng để bắt đầu ván đấu!"
+                error: "Cần tối thiểu 1 người chơi trong phòng để bắt đầu ván đấu!"
             });
         }
 
         const quizObj = (body.openingQuiz && body.openingQuiz.quiz) ? body.openingQuiz.quiz : body.openingQuiz;
+
+        if (body.skipOpeningQuiz || activeSeats.length === 1) {
+            room.status = "playing";
+            room.gameState = body.gameState || null;
+            room.openingQuiz = null;
+            room.openingAnswers = {};
+            room.version++;
+            room.updatedAt = Date.now();
+            saveRoomsToDisk();
+            return sendJSON(res, 200, { ok: true, room });
+        }
 
         room.status = "turn_order_quiz";
         room.gameState = body.gameState || null;
         const nowMs = Date.now();
         room.openingQuiz = {
             quiz: quizObj,
-            countdownEndsAt: nowMs + 10000,
-            startedAt: nowMs + 10000,
+            countdownEndsAt: nowMs + 3000,
+            startedAt: nowMs + 3000,
             completed: false,
             rankings: []
         };
@@ -771,7 +789,11 @@ http.createServer(async (req, res) => {
             : (Array.isArray(body.players) ? body.players : null);
         if (incomingPlayers && Array.isArray(room.gameState.players)) {
             incomingPlayers.forEach(up => {
-                const target = room.gameState.players.find(p => p.id === up.id);
+                const target = room.gameState.players.find(p =>
+                    (up.shipKey && p.shipKey === up.shipKey) ||
+                    (up.clientId && p.clientId === up.clientId) ||
+                    p.id === up.id
+                );
                 if (target) {
                     if (typeof up.coins === "number") target.coins = up.coins;
                     if (typeof up.food === "number") target.food = up.food;
