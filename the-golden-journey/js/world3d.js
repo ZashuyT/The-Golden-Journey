@@ -1,12 +1,14 @@
 // ============================================================================
-// THE GOLDEN JOURNEY (HÀNH TRÌNH VÀNG SON) — V6.0 ULTRA-HD TRUE S-CURVE VIETNAM 3D WORLD
-// - True Mathematical S-Curve of Vietnam (North Crown -> West Bend at Bắc Trung Bộ ->
-//   East Bulge at Tây Nguyên & Nam Trung Bộ -> South-West Tail Hook at ĐBSCL & Cà Mau)
-// - 6 Economic Regions Modeled Faithfully After Reference Diorama (Inland Tây Nguyên
-//   West of Central Coast, 9 Mekong River Channels, Golden Red River Delta, Northern Peaks)
-// - High-Resolution 4096x4096 Soft Shadows, Tropical Lagoon Gradients & Living Ocean
-// - Toggleable Sky Clouds, Local-Player-Only 3D Arrow Marker, and Immutable Ship Identity Keys
+// THE GOLDEN JOURNEY (HÀNH TRÌNH VÀNG SON) — V9.0 4X GRAND SCALE & HIGH-FPS 3D WORLD
+// - 4x Larger Hex Tiles (hexRadius = 9.04) & 4x Larger 3D Models with Wide Spacing
+// - Well-Spaced POIs (Ports, Monuments, Resources, Reefs) — Zero Crowding
+// - Ship Spotlight & Occupied-Tile Fade: When a Ship Enters a Tile, the Tile &
+//   Its Model Fade Out while the Ship Scales Up & Glows Prominently
+// - Ultra-Smooth Anti-Lag Performance (No Per-Frame 12k Vertex Normals, No 4K
+//   Shadow Map Overhead, Fast Pickable Raycasting & Throttled Hover)
 // ============================================================================
+
+const WORLD_SCALE_4X = 4.0;
 
 class World3D {
     constructor(containerId, onHexClickCallback, onHexHoverCallback) {
@@ -14,12 +16,13 @@ class World3D {
         this.onHexClick = onHexClickCallback;
         this.onHexHover = onHexHoverCallback;
 
-        this.hexRadius = 2.26;
+        // 4x larger than previous 2.26 -> 9.04!
+        this.hexRadius = 2.26 * WORLD_SCALE_4X;
         this.hexTiles = [];
         this.hexMap = new Map(); // "q,r" -> tileObj
+        this.pickableMeshes = [];
         this.shipMeshes = new Map(); // shipKey -> THREE.Group
         this.floatingEffects = [];
-        this.waterVertices = [];
         this.animatedLandProps = [];
         this.fairSpawnAnchors = [];
         this.activeNPCTile = null;
@@ -52,31 +55,32 @@ class World3D {
 
     initScene() {
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x074e78);
-        this.scene.fog = new THREE.FogExp2(0x074e78, 0.0028);
+        this.scene.background = new THREE.Color(0x18384e);
+        this.scene.fog = new THREE.FogExp2(0x18384e, 0.00055);
 
         const w = this.container.clientWidth || window.innerWidth;
         const h = this.container.clientHeight || window.innerHeight;
 
-        this.camera = new THREE.PerspectiveCamera(42, w / h, 0.5, 850);
-        this.camera.position.set(12, 84, 66);
+        this.camera = new THREE.PerspectiveCamera(42, w / h, 2.0, 3200);
+        // Closer relative camera view so the 4x hexes and models look huge and spacious on screen
+        this.camera.position.set(36, 175, 145);
 
         this.renderer = new THREE.WebGLRenderer({
             antialias: true,
             powerPreference: "high-performance"
         });
         this.renderer.setSize(w, h);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // Capped at 1.25 for silky-smooth FPS without GPU fillrate lag
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+        this.renderer.shadowMap.enabled = false;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.26;
+        this.renderer.toneMappingExposure = 0.96;
         this.container.innerHTML = "";
         this.container.appendChild(this.renderer.domElement);
 
         this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.07;
+        this.controls.dampingFactor = 0.08;
         this.controls.enablePan = false; // Panning is controlled via W A S D keys
         this.controls.mouseButtons = {
             LEFT: -1, // Left mouse button is reserved for selecting hexes & custom path drawing
@@ -85,37 +89,23 @@ class World3D {
         };
         this.controls.maxPolarAngle = Math.PI / 2.18;
         this.controls.minPolarAngle = Math.PI / 11;
-        this.controls.minDistance = 14;
-        this.controls.maxDistance = 225;
-        this.controls.target.set(0, 0, 2);
+        this.controls.minDistance = 40;
+        this.controls.maxDistance = 760;
+        this.controls.target.set(0, 0, 8);
 
-        // Rich Tropical Sunlight & Hemisphere Illumination
-        this.hemiLight = new THREE.HemisphereLight(0xfffbeb, 0x0284c7, 1.15);
-        this.hemiLight.position.set(0, 95, 0);
+        // Soft, Eye-Friendly Natural Daylight (No Heavy Shadow Map Overhead)
+        this.hemiLight = new THREE.HemisphereLight(0xf4f1ea, 0x1e3f5a, 0.88);
+        this.hemiLight.position.set(0, 320, 0);
         this.scene.add(this.hemiLight);
 
-        this.sunLight = new THREE.DirectionalLight(0xfffef0, 1.72);
-        this.sunLight.position.set(54, 92, 48);
-        this.sunLight.castShadow = true;
-        this.sunLight.shadow.mapSize.width = 4096;
-        this.sunLight.shadow.mapSize.height = 4096;
-        this.sunLight.shadow.bias = -0.0004;
-        this.sunLight.shadow.camera.near = 5;
-        this.sunLight.shadow.camera.far = 280;
-        const d = 104;
-        this.sunLight.shadow.camera.left = -d;
-        this.sunLight.shadow.camera.right = d;
-        this.sunLight.shadow.camera.top = d;
-        this.sunLight.shadow.camera.bottom = -d;
+        this.sunLight = new THREE.DirectionalLight(0xfff6e5, 1.08);
+        this.sunLight.position.set(180, 320, 160);
+        this.sunLight.castShadow = false;
         this.scene.add(this.sunLight);
 
-        this.rimLight = new THREE.DirectionalLight(0x38bdf8, 0.68);
-        this.rimLight.position.set(-55, 42, -45);
+        this.rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.25);
+        this.rimLight.position.set(-180, 140, -150);
         this.scene.add(this.rimLight);
-
-        this.warmFillLight = new THREE.DirectionalLight(0xfde047, 0.35);
-        this.warmFillLight.position.set(0, 35, 65);
-        this.scene.add(this.warmFillLight);
 
         this.boardGroup = new THREE.Group();
         this.scene.add(this.boardGroup);
@@ -133,60 +123,61 @@ class World3D {
 
         this.clouds = [];
         const cloudMat = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            roughness: 0.88,
+            color: 0xf1f5f9,
+            roughness: 0.92,
             transparent: true,
-            opacity: 0.72
+            opacity: 0.30
         });
 
-        for (let i = 0; i < 20; i++) {
+        // 5 lightweight outer clouds
+        for (let i = 0; i < 5; i++) {
             const cGroup = new THREE.Group();
-            const puffs = 3 + Math.floor(Math.random() * 3);
-            for (let p = 0; p < puffs; p++) {
-                const puffGeo = new THREE.DodecahedronGeometry(1.35 + Math.random() * 1.0, 1);
-                puffGeo.scale(1.35, 0.52, 1.0);
+            for (let p = 0; p < 2; p++) {
+                const puffGeo = new THREE.DodecahedronGeometry((1.3 + p * 0.4) * WORLD_SCALE_4X, 0);
+                puffGeo.scale(1.4, 0.45, 1.0);
                 const puff = new THREE.Mesh(puffGeo, cloudMat);
-                puff.position.set((p - 1.5) * 1.35, Math.random() * 0.32, (Math.random() - 0.5) * 0.95);
+                puff.position.set((p - 0.5) * 1.4 * WORLD_SCALE_4X, 0, 0);
                 cGroup.add(puff);
             }
-            cGroup.position.set((Math.random() - 0.5) * 175, 23 + Math.random() * 7, (Math.random() - 0.5) * 175);
+            const sideZ = (i % 2 === 0 ? 1 : -1) * (150 + i * 25);
+            cGroup.position.set((i - 2) * 90, 98 + (i % 2) * 12, sideZ);
             cGroup.visible = this.cloudsVisible;
             this.weatherGroup.add(cGroup);
             this.clouds.push({
                 mesh: cGroup,
-                speed: 0.52 + Math.random() * 0.60
+                speed: (0.35 + (i % 3) * 0.12) * WORLD_SCALE_4X
             });
         }
         this.cloudMaterial = cloudMat;
 
-        const starCount = 520;
+        const starCount = 160;
         const starGeo = new THREE.BufferGeometry();
         const starPos = new Float32Array(starCount * 3);
         for (let i = 0; i < starCount; i++) {
-            starPos[i * 3] = (Math.random() - 0.5) * 230;
-            starPos[i * 3 + 1] = 4 + Math.random() * 48;
-            starPos[i * 3 + 2] = (Math.random() - 0.5) * 230;
+            starPos[i * 3] = (Math.random() - 0.5) * 850;
+            starPos[i * 3 + 1] = 16 + Math.random() * 180;
+            starPos[i * 3 + 2] = (Math.random() - 0.5) * 850;
         }
         starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
         this.starField = new THREE.Points(
             starGeo,
-            new THREE.PointsMaterial({ color: 0xfef08a, size: 0.45, transparent: true, opacity: 0.0 })
+            new THREE.PointsMaterial({ color: 0xfde68a, size: 1.4, transparent: true, opacity: 0.0 })
         );
         this.weatherGroup.add(this.starField);
 
-        // Rain Particle Field for Tropical Rain, Thunderstorm & Super Typhoon Yagi
-        const rainCount = 900;
+        // Lightweight Rain Particle Field (240 drops instead of 900)
+        const rainCount = 240;
         const rainGeo = new THREE.BufferGeometry();
         const rainPos = new Float32Array(rainCount * 3);
         for (let i = 0; i < rainCount; i++) {
-            rainPos[i * 3] = (Math.random() - 0.5) * 180;
-            rainPos[i * 3 + 1] = Math.random() * 45;
-            rainPos[i * 3 + 2] = (Math.random() - 0.5) * 180;
+            rainPos[i * 3] = (Math.random() - 0.5) * 650;
+            rainPos[i * 3 + 1] = Math.random() * 160;
+            rainPos[i * 3 + 2] = (Math.random() - 0.5) * 650;
         }
         rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPos, 3));
         this.rainField = new THREE.Points(
             rainGeo,
-            new THREE.PointsMaterial({ color: 0xbae6fd, size: 0.36, transparent: true, opacity: 0.0 })
+            new THREE.PointsMaterial({ color: 0xbae6fd, size: 1.1, transparent: true, opacity: 0.0 })
         );
         this.weatherGroup.add(this.rainField);
     }
@@ -196,13 +187,6 @@ class World3D {
         if (this.clouds) {
             this.clouds.forEach(c => {
                 if (c.mesh) c.mesh.visible = this.cloudsVisible;
-            });
-        }
-        if (this.animatedLandProps) {
-            this.animatedLandProps.forEach(item => {
-                if (item.type === "orbit_cloud" && item.mesh) {
-                    item.mesh.visible = this.cloudsVisible && !this.minimalistMode;
-                }
             });
         }
         return this.cloudsVisible;
@@ -216,47 +200,8 @@ class World3D {
 
     applyMinimalistMode() {
         const showExtra = !this.minimalistMode;
-        if (this.ambientSeagulls) {
-            this.ambientSeagulls.forEach(sg => { if (sg.mesh) sg.mesh.visible = showExtra; });
-        }
-        if (this.ambientDolphins) {
-            this.ambientDolphins.forEach(dp => { if (dp.mesh) dp.mesh.visible = showExtra; });
-        }
-        if (this.ambientFishSchools) {
-            this.ambientFishSchools.forEach(fs => { if (fs.mesh) fs.mesh.visible = showExtra; });
-        }
-        if (this.ambientSampans) {
-            this.ambientSampans.forEach(sp => { if (sp.mesh) sp.mesh.visible = showExtra; });
-        }
-        if (this.ambientLighthouses) {
-            this.ambientLighthouses.forEach(lh => {
-                if (lh.userData && lh.userData.beam) lh.userData.beam.visible = showExtra;
-            });
-        }
-        if (this.ambientOilRigs) {
-            this.ambientOilRigs.forEach(rig => {
-                if (rig.userData && rig.userData.flame) rig.userData.flame.visible = showExtra;
-            });
-        }
-        if (this.foamRings) {
-            this.foamRings.forEach(f => { if (f.mesh) f.mesh.visible = showExtra; });
-        }
-        if (this.animatedLandProps) {
-            this.animatedLandProps.forEach(item => {
-                if (!item.mesh) return;
-                if (item.type === "orbit_cloud") {
-                    item.mesh.visible = showExtra && this.cloudsVisible;
-                } else if (item.type === "smoke_rise" || item.type === "flicker_fire" || item.type === "bob_boat" || item.type === "shimmer_water") {
-                    item.mesh.visible = showExtra;
-                }
-            });
-        }
-        if (this.shipMeshes) {
-            this.shipMeshes.forEach(ship => {
-                if (ship.userData && ship.userData.beaconPillar) {
-                    ship.userData.beaconPillar.visible = showExtra;
-                }
-            });
+        if (this.sceneryGroup) {
+            this.sceneryGroup.visible = showExtra;
         }
     }
 
@@ -288,34 +233,34 @@ class World3D {
         this.weatherMode = validMode;
         const presets = {
             sunny: {
-                bg: 0x074e78, fog: 0x074e78, hemiSky: 0xfffbeb, hemiGround: 0x0284c7, hemiInt: 1.12,
-                sunCol: 0xfffef0, sunInt: 1.68, sunPos: [48, 82, 42], cloudCol: 0xffffff, cloudOp: 0.72,
-                waveAmp: 1.0, starsOp: 0.0, rainOp: 0.0
+                bg: 0x18384e, fog: 0x18384e, hemiSky: 0xf4f1ea, hemiGround: 0x1e3f5a, hemiInt: 0.88,
+                sunCol: 0xfff6e5, sunInt: 1.08, sunPos: [180, 320, 160], cloudCol: 0xf1f5f9, cloudOp: 0.30,
+                waveAmp: 0.70, starsOp: 0.0, rainOp: 0.0
             },
             tropical_rain: {
-                bg: 0x1e3a4c, fog: 0x1e3a4c, hemiSky: 0x94a3b8, hemiGround: 0x0f172a, hemiInt: 0.85,
-                sunCol: 0xcbd5e1, sunInt: 1.05, sunPos: [30, 75, 25], cloudCol: 0x64748b, cloudOp: 0.88,
-                waveAmp: 1.45, starsOp: 0.0, rainOp: 0.72
+                bg: 0x1c3142, fog: 0x1c3142, hemiSky: 0x94a3b8, hemiGround: 0x0f172a, hemiInt: 0.74,
+                sunCol: 0xcbd5e1, sunInt: 0.86, sunPos: [120, 280, 100], cloudCol: 0x64748b, cloudOp: 0.42,
+                waveAmp: 0.90, starsOp: 0.0, rainOp: 0.48
             },
             thunderstorm: {
-                bg: 0x0f172a, fog: 0x0f172a, hemiSky: 0x64748b, hemiGround: 0x020617, hemiInt: 0.68,
-                sunCol: 0x93c5fd, sunInt: 0.82, sunPos: [20, 68, 20], cloudCol: 0x334155, cloudOp: 0.94,
-                waveAmp: 1.85, starsOp: 0.15, rainOp: 0.88
+                bg: 0x121f2e, fog: 0x121f2e, hemiSky: 0x64748b, hemiGround: 0x09111c, hemiInt: 0.62,
+                sunCol: 0x93c5fd, sunInt: 0.72, sunPos: [80, 260, 80], cloudCol: 0x475569, cloudOp: 0.48,
+                waveAmp: 1.10, starsOp: 0.12, rainOp: 0.62
             },
             sunset: {
-                bg: 0x451a03, fog: 0x7c2d12, hemiSky: 0xfda4af, hemiGround: 0x1e1b4b, hemiInt: 0.92,
-                sunCol: 0xf97316, sunInt: 1.75, sunPos: [-52, 28, 38], cloudCol: 0xfed7aa, cloudOp: 0.80,
-                waveAmp: 1.05, starsOp: 0.38, rainOp: 0.0
+                bg: 0x2d1e28, fog: 0x38242e, hemiSky: 0xf3c6b6, hemiGround: 0x1f2438, hemiInt: 0.78,
+                sunCol: 0xe89b6c, sunInt: 1.05, sunPos: [-180, 130, 140], cloudCol: 0xf5d0b5, cloudOp: 0.35,
+                waveAmp: 0.72, starsOp: 0.30, rainOp: 0.0
             },
             night: {
-                bg: 0x020617, fog: 0x020617, hemiSky: 0x38bdf8, hemiGround: 0x0f172a, hemiInt: 0.62,
-                sunCol: 0x93c5fd, sunInt: 0.85, sunPos: [-30, 56, -30], cloudCol: 0x334155, cloudOp: 0.55,
-                waveAmp: 0.90, starsOp: 0.95, rainOp: 0.0
+                bg: 0x0c1826, fog: 0x0c1826, hemiSky: 0x5c8ab5, hemiGround: 0x0c1624, hemiInt: 0.58,
+                sunCol: 0x93c5fd, sunInt: 0.72, sunPos: [-120, 220, -120], cloudCol: 0x334155, cloudOp: 0.25,
+                waveAmp: 0.65, starsOp: 0.75, rainOp: 0.0
             },
             super_typhoon_yagi: {
-                bg: 0x1a0612, fog: 0x280819, hemiSky: 0xf43f5e, hemiGround: 0x090206, hemiInt: 0.72,
-                sunCol: 0xfda4af, sunInt: 0.95, sunPos: [10, 64, 15], cloudCol: 0x4c0519, cloudOp: 0.96,
-                waveAmp: 2.30, starsOp: 0.10, rainOp: 0.96
+                bg: 0x1c1018, fog: 0x24131d, hemiSky: 0xd97788, hemiGround: 0x0e080c, hemiInt: 0.64,
+                sunCol: 0xe2a8b4, sunInt: 0.78, sunPos: [40, 240, 60], cloudCol: 0x4c1d2e, cloudOp: 0.50,
+                waveAmp: 1.25, starsOp: 0.08, rainOp: 0.70
             }
         };
 
@@ -338,48 +283,24 @@ class World3D {
     }
 
     initOcean() {
-        this.waveMultiplier = 1.0;
-        const oceanGeo = new THREE.PlaneGeometry(340, 340, 140, 140);
+        this.waveMultiplier = 0.70;
+        // Ultra-fast 2x2 plane (Zero per-frame CPU vertex deformation or normal recalculation!)
+        const oceanGeo = new THREE.PlaneGeometry(2400, 2400, 2, 2);
         oceanGeo.rotateX(-Math.PI / 2);
 
-        const pos = oceanGeo.attributes.position;
-        this.waterVertices = [];
-        for (let i = 0; i < pos.count; i++) {
-            this.waterVertices.push({
-                x: pos.getX(i),
-                y: pos.getY(i),
-                z: pos.getZ(i),
-                phase: Math.random() * Math.PI * 2
-            });
-        }
-
         const oceanMat = new THREE.MeshStandardMaterial({
-            color: 0x0369a1,
-            emissive: 0x082f49,
-            emissiveIntensity: 0.34,
-            roughness: 0.16,
-            metalness: 0.52,
-            flatShading: true,
-            transparent: true,
-            opacity: 0.97
+            color: 0x1c4660,
+            emissive: 0x0b2233,
+            emissiveIntensity: 0.12,
+            roughness: 0.56,
+            metalness: 0.12
         });
 
         this.oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
-        this.oceanMesh.position.y = -0.18;
-        this.oceanMesh.receiveShadow = true;
+        this.oceanMesh.position.y = -0.20 * WORLD_SCALE_4X;
         this.scene.add(this.oceanMesh);
 
         this.foamRings = [];
-        const foamMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.32, side: THREE.DoubleSide });
-        for (let i = 0; i < 72; i++) {
-            const rGeo = new THREE.RingGeometry(0.42, 0.68, 18);
-            rGeo.rotateX(-Math.PI / 2);
-            const ring = new THREE.Mesh(rGeo, foamMat.clone());
-            ring.position.set((Math.random() - 0.5) * 185, -0.05, (Math.random() - 0.5) * 185);
-            this.scene.add(ring);
-            this.foamRings.push({ mesh: ring, speed: 0.65 + Math.random() * 0.8, offset: Math.random() * 6 });
-        }
-
         this.initAmbientOceanScenery();
     }
 
@@ -387,140 +308,24 @@ class World3D {
         this.sceneryGroup = new THREE.Group();
         this.scene.add(this.sceneryGroup);
 
-        // 1. 10 Picturesque Limestone Karst Islands & Atolls around the Outer Sea
+        // 4 Static Distant Karst Outcrops on the outer horizon (zero per-frame CPU cost)
         const karstLocations = [
-            { x: 44, z: -38, scale: 1.95, rot: 0.4 },
-            { x: 48, z: -18, scale: 1.65, rot: 1.2 },
-            { x: 50, z: 2, scale: 1.80, rot: 0.9 },
-            { x: 46, z: 20, scale: 2.00, rot: 2.1 },
-            { x: 40, z: 40, scale: 1.75, rot: 2.8 },
-            { x: 14, z: 52, scale: 1.60, rot: 1.6 },
-            { x: -24, z: 48, scale: 1.75, rot: 0.5 }, // Phú Quốc / Thổ Chu area
-            { x: -42, z: -32, scale: 1.75, rot: 0.8 },
-            { x: -44, z: 28, scale: 1.80, rot: 1.9 },
-            { x: 20, z: -48, scale: 1.65, rot: 2.4 }
+            { x: 66 * WORLD_SCALE_4X, z: -44 * WORLD_SCALE_4X, scale: 1.35, rot: 0.4 },
+            { x: 70 * WORLD_SCALE_4X, z: 8 * WORLD_SCALE_4X, scale: 1.30, rot: 0.9 },
+            { x: 62 * WORLD_SCALE_4X, z: 50 * WORLD_SCALE_4X, scale: 1.35, rot: 2.8 },
+            { x: -54 * WORLD_SCALE_4X, z: -36 * WORLD_SCALE_4X, scale: 1.30, rot: 0.8 }
         ];
         karstLocations.forEach(kl => {
             const kMesh = ProceduralModels.createDistantKarstOutcrop(kl.scale);
-            kMesh.position.set(kl.x, -0.15, kl.z);
+            kMesh.position.set(kl.x, -0.18 * WORLD_SCALE_4X, kl.z);
             kMesh.rotation.y = kl.rot;
             this.sceneryGroup.add(kMesh);
         });
-
-        // 2. 4 Coastal & Island Lighthouses with Rotating Light Beams
-        this.ambientLighthouses = [];
-        const lhCoords = [
-            { x: 38, z: -28 },
-            { x: 42, z: -4 },
-            { x: 40, z: 14 },
-            { x: 24, z: 44 }
-        ];
-        lhCoords.forEach(lc => {
-            const lh = ProceduralModels.createSeaLighthouseIsland();
-            lh.position.set(lc.x, -0.15, lc.z);
-            lh.scale.setScalar(1.42);
-            this.sceneryGroup.add(lh);
-            this.ambientLighthouses.push(lh);
-        });
-
-        // 3. 3 Offshore Oil & Gas Platforms (Bạch Hổ / Lan Tây / Rồng Đôi)
-        this.ambientOilRigs = [];
-        const rigCoords = [
-            { x: 28, z: 28 },
-            { x: 36, z: 35 },
-            { x: 16, z: 42 }
-        ];
-        rigCoords.forEach(rc => {
-            const rig = ProceduralModels.createOffshoreOilRig();
-            rig.position.set(rc.x, -0.15, rc.z);
-            rig.scale.setScalar(1.42);
-            this.sceneryGroup.add(rig);
-            this.ambientOilRigs.push(rig);
-        });
-
-        // 4. 12 Traditional Vietnamese Sailing Sampans & Fishing Boats
-        this.ambientSampans = [];
-        for (let i = 0; i < 12; i++) {
-            const sampan = ProceduralModels.createAmbientFishingSampan();
-            sampan.scale.setScalar(1.45);
-            const radius = 38 + (i % 4) * 5.5;
-            const angle = (i / 12) * Math.PI * 2;
-            this.sceneryGroup.add(sampan);
-            this.ambientSampans.push({
-                mesh: sampan,
-                radius,
-                angle,
-                speed: (0.055 + (i % 3) * 0.02) * (i % 2 === 0 ? 1 : -1),
-                centerX: 6,
-                centerZ: 0
-            });
-        }
-
-        // 5. 6 Jumping Dolphin Pods leaping out of the waves!
-        this.ambientDolphins = [];
-        const dolphinCenters = [
-            { x: 32, z: -22 },
-            { x: 36, z: -6 },
-            { x: 34, z: 12 },
-            { x: 28, z: 24 },
-            { x: 8, z: 42 },
-            { x: -26, z: 38 }
-        ];
-        dolphinCenters.forEach((dc, idx) => {
-            const pod = ProceduralModels.createJumpingDolphinPod();
-            pod.scale.setScalar(1.38);
-            this.sceneryGroup.add(pod);
-            this.ambientDolphins.push({
-                mesh: pod,
-                centerX: dc.x,
-                centerZ: dc.z,
-                radius: 4.5 + (idx % 2) * 1.8,
-                angle: idx * 1.2,
-                speed: 0.45 + (idx % 3) * 0.08,
-                jumpPhase: idx * 1.1
-            });
-        });
-
-        // 6. 8 Glowing Fish Schools swimming beneath the crystal water
-        this.ambientFishSchools = [];
-        const fishCenters = [
-            { x: 28, z: -30 },
-            { x: 34, z: -14 },
-            { x: 36, z: 4 },
-            { x: 32, z: 18 },
-            { x: 22, z: 32 },
-            { x: 2, z: 40 },
-            { x: -18, z: 34 },
-            { x: 18, z: -38 }
-        ];
-        fishCenters.forEach((fc, idx) => {
-            const school = ProceduralModels.createGlowingFishSchool();
-            school.position.set(fc.x, -0.08, fc.z);
-            this.sceneryGroup.add(school);
-            this.ambientFishSchools.push({
-                mesh: school,
-                speed: 0.65 + (idx % 3) * 0.2
-            });
-        });
-
-        // 7. 10 Flocks of Seagulls & Lac Birds with Animated Flapping Wings
-        this.ambientSeagulls = [];
-        for (let i = 0; i < 10; i++) {
-            const flock = ProceduralModels.createSeagullFlock();
-            flock.scale.setScalar(1.38);
-            this.sceneryGroup.add(flock);
-            this.ambientSeagulls.push({
-                mesh: flock,
-                radius: 18 + i * 3.8,
-                angle: i * 0.9,
-                speed: 0.22 + (i % 3) * 0.06,
-                height: 9.5 + (i % 4) * 2.0
-            });
-        }
     }
 
     axialToWorld(q, r) {
-        const size = this.hexRadius * 1.03;
+        // 1.15 spacing factor creates a generous, clean gap between all 4x hexes so models never feel cramped!
+        const size = this.hexRadius * 1.15;
         const x = size * Math.sqrt(3) * (q + r / 2);
         const z = size * (3 / 2) * r;
         return { x, z };
@@ -530,24 +335,8 @@ class World3D {
         return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
     }
 
-    // ------------------------------------------------------------------------
-    // V6.0 TRUE S-CURVE VIETNAM MAP & 6 ECONOMIC REGIONS (Modeled on Reference Photo)
-    // - `col` is the true horizontal screen column (West = negative, East = positive):
-    //   1. North (`r = -14..-8`): Wide Northern Crown (`col = -5..+4`), divided into
-    //      Region 0 (Trung du & Miền núi Bắc Bộ — Deep Green) & Region 1 (Đồng bằng Sông Hồng — Bright Yellow)
-    //   2. Upper-Left Bend of 'S' (`r = -7..-3`): Curves strongly West (`col = -5..-2`),
-    //      forming Bắc Trung Bộ & Vịnh Bắc Bộ (Region 2 — Slate-Teal)
-    //   3. Middle-Right Bulge of 'S' (`r = -2..+4`): Curves strongly East (`col = -1..+4`),
-    //      with Region 3 (Tây Nguyên — Basalt Brown) on the elevated INLAND WEST (`col = -1..+2`)
-    //      and Region 2 (Duyên hải Miền Trung — Slate-Teal) hugging the OUTER EAST COAST (`col = +2..+4`)!
-    //   4. Lower-Right to SW Transition (`r = +5..+8`): Curves SW (`col = -4..+1`),
-    //      forming Region 4 (Đông Nam Bộ — Crimson-Burgundy)
-    //   5. Bottom-Left Hook of 'S' (`r = +8..+14`): Sweeps far SW (`col = -8..-3`) to Mũi Cà Mau,
-    //      forming Region 5 (Đồng bằng Sông Cửu Long — Alluvial Green) with navigable Mekong River channels!
-    // ------------------------------------------------------------------------
     getVietnamLandRowSpec(r) {
         const table = {
-            // 1. TRUNG DU & MIỀN NÚI BẮC BỘ (Region 0) + 2. ĐỒNG BẰNG SÔNG HỒNG (Region 1 — Wide, Solid Golden Plain)
             "-14": { minCol: -2, maxCol: 2,  getReg: () => 0 },
             "-13": { minCol: -4, maxCol: 3,  getReg: () => 0 },
             "-12": { minCol: -5, maxCol: 3,  getReg: () => 0 },
@@ -556,7 +345,6 @@ class World3D {
             "-9":  { minCol: -4, maxCol: 1,  getReg: (c) => (c >= -3 ? 1 : 0) },
             "-8":  { minCol: -4, maxCol: 0,  getReg: () => 1 },
 
-            // Upper-Left Concave Bend of the Letter S (Bắc Trung Bộ — Region 2)
             "-7":  { minCol: -5, maxCol: -1, getReg: () => 2 },
             "-6":  { minCol: -5, maxCol: -2, getReg: () => 2 },
             "-5":  { minCol: -5, maxCol: -2, getReg: () => 2 },
@@ -564,8 +352,6 @@ class World3D {
             "-3":  { minCol: -3, maxCol: 0,  getReg: () => 2 },
             "-2":  { minCol: -2, maxCol: 2,  getReg: () => 2 },
 
-            // Middle-Right Convex Bulge of the Letter S:
-            // Inland West = 4. Tây Nguyên (Region 3), Outer East Coast = 3. Duyên hải Miền Trung (Region 2)
             "-1":  { minCol: -1, maxCol: 2,  getReg: (c) => (c <= 0 ? 3 : 2) },
             "0":   { minCol: -1, maxCol: 3,  getReg: (c) => (c <= 1 ? 3 : 2) },
             "1":   { minCol: 0,  maxCol: 4,  getReg: (c) => (c <= 2 ? 3 : 2) },
@@ -573,12 +359,10 @@ class World3D {
             "3":   { minCol: -1, maxCol: 3,  getReg: (c) => (c <= 1 ? 3 : 2) },
             "4":   { minCol: -1, maxCol: 2,  getReg: (c) => (c <= 0 ? 3 : 2) },
 
-            // South-Westward Curve into Đông Nam Bộ (Region 4)
             "5":   { minCol: -3, maxCol: 1,  getReg: (c) => (c <= 0 ? 4 : 2) },
             "6":   { minCol: -4, maxCol: 0,  getReg: () => 4 },
             "7":   { minCol: -5, maxCol: 0,  getReg: () => 4 },
 
-            // Bottom-Left Tail Hook of the Letter S: Đồng bằng Sông Cửu Long (Region 5) — 100% Solid Lush Delta!
             "8":   { minCol: -6, maxCol: -1, getReg: (c) => (c >= -2 ? 4 : 5) },
             "9":   { minCol: -7, maxCol: -2, getReg: () => 5 },
             "10":  { minCol: -8, maxCol: -2, getReg: () => 5 },
@@ -596,6 +380,7 @@ class World3D {
         }
         this.hexTiles = [];
         this.hexMap.clear();
+        this.pickableMeshes = [];
         this.animatedLandProps = [];
         this.fairSpawnAnchors = [];
         this.activeNPCTile = null;
@@ -604,86 +389,65 @@ class World3D {
         const spawnAnchorKeys = new Set([
             "-10,7", // Anchor 1 (Vịnh Bắc Bộ)
             "-5,4",  // Anchor 2 (Bắc Trung Bộ)
-            "0,6",   // Anchor 3 (Duyên hải Miền Trung – Tây Nguyên)
-            "6,4",   // Anchor 4 (Đông Nam Bộ)
-            "11,0"   // Anchor 5 (Đồng bằng Sông Cửu Long)
+            "0,7",   // Anchor 3 (Duyên hải Miền Trung – Tây Nguyên)
+            "6,5",   // Anchor 4 (Đông Nam Bộ)
+            "11,2"   // Anchor 5 (Đồng bằng Sông Cửu Long)
         ]);
 
-        // 6 Trading Ports, 9 Monuments, 25 Resource Nodes (15 Coastal + 10 Offshore Sea Nodes),
-        // 10 Navigable Sea Reefs (Bãi Đá Ngầm: -1 HP if sailed through),
-        // & 2 Sovereignty Archipelagos (Hoàng Sa & Trường Sa).
-        // ALL coastal POIs sit cleanly in the coastal waters (`col > rowSpec.maxCol`),
-        // so the mainland & deltas (`minCol..maxCol`) are 100% solid with ZERO holes!
+        // WELL-SPACED POIs across a wider sea expanse (col up to 12):
+        // Every Monument (9), Trading Port (6), Resource Node (15), Reef (6), and Archipelago (2)
+        // is separated by open water hexes so NO two 3D models sit bunched up next to each other!
         const specialPlacements = {
             // 1. TRUNG DU & MIỀN NÚI BẮC BỘ (Region 0)
             "-14,3":  { terrain: "coast", monumentId: "mon_sapa", regionId: 0, navigable: true },
-            "-13,5":  { terrain: "coast", resourceType: "iron", regionId: 0, navigable: true },
-            "-12,4":  { terrain: "coast", isPort: true, portName: "Thương Cảng Cái Lân (Quảng Ninh)", regionId: 0, navigable: true },
-            "-12,7":  { terrain: "coast", resourceType: "wood", regionId: 0, navigable: true },
-            "-11,4":  { terrain: "island", monumentId: "mon_halong", regionId: 0, navigable: true },
-            // Offshore Region 0 Resources & Reef
-            "-13,8":  { terrain: "sea", resourceType: "food", regionId: 0, navigable: true, isOffshore: true },
-            "-11,9":  { terrain: "sea", resourceType: "iron", regionId: 0, navigable: true, isOffshore: true },
-            "-12,5":  { terrain: "reef", isReef: true, regionId: 0, navigable: true },
+            "-14,7":  { terrain: "sea", resourceType: "iron", regionId: 0, navigable: true },
+            "-13,11": { terrain: "sea", resourceType: "food", regionId: 0, navigable: true, isOffshore: true },
+            "-12,5":  { terrain: "coast", isPort: true, portName: "Thương Cảng Cái Lân (Quảng Ninh)", regionId: 0, navigable: true },
+            "-12,9":  { terrain: "reef", isReef: true, regionId: 0, navigable: true },
+            "-11,3":  { terrain: "island", monumentId: "mon_halong", regionId: 0, navigable: true },
+            "-11,12": { terrain: "sea", resourceType: "wood", regionId: 0, navigable: true, isOffshore: true },
 
             // 2. ĐỒNG BẰNG SÔNG HỒNG (Region 1)
-            "-10,3":  { terrain: "coast", monumentId: "mon_vanmieu", regionId: 1, navigable: true },
-            "-10,5":  { terrain: "coast", resourceType: "food", regionId: 1, navigable: true },
-            "-9,2":   { terrain: "coast", isPort: true, portName: "Thương Cảng Hải Phòng", regionId: 1, navigable: true },
-            "-8,2":   { terrain: "coast", resourceType: "wood", regionId: 1, navigable: true },
-            // Offshore Region 1 Resources & Reefs
-            "-9,8":   { terrain: "sea", resourceType: "wood", regionId: 1, navigable: true, isOffshore: true },
-            "-8,10":  { terrain: "sea", resourceType: "food", regionId: 1, navigable: true, isOffshore: true },
-            "-9,4":   { terrain: "reef", isReef: true, regionId: 1, navigable: true },
-            "-8,6":   { terrain: "reef", isReef: true, regionId: 1, navigable: true },
+            "-9,2":   { terrain: "coast", monumentId: "mon_vanmieu", regionId: 1, navigable: true },
+            "-9,6":   { terrain: "sea", resourceType: "food", regionId: 1, navigable: true },
+            "-9,10":  { terrain: "sea", resourceType: "iron", regionId: 1, navigable: true, isOffshore: true },
+            "-8,4":   { terrain: "reef", isReef: true, regionId: 1, navigable: true },
+            "-7,1":   { terrain: "coast", isPort: true, portName: "Thương Cảng Hải Phòng", regionId: 1, navigable: true },
+            "-7,8":   { terrain: "sea", resourceType: "wood", regionId: 1, navigable: true, isOffshore: true },
 
             // 3. BẮC TRUNG BỘ & DUYÊN HẢI MIỀN TRUNG (Region 2)
-            "-7,0":   { terrain: "coast", resourceType: "iron", regionId: 2, navigable: true },
             "-5,-1":  { terrain: "coast", monumentId: "mon_phongnha", regionId: 2, navigable: true },
-            "-5,2":   { terrain: "coast", resourceType: "food", regionId: 2, navigable: true },
+            "-5,7":   { terrain: "sea", resourceType: "iron", regionId: 2, navigable: true },
+            "-5,11":  { terrain: "sea", resourceType: "food", regionId: 2, navigable: true, isOffshore: true },
+            "-4,2":   { terrain: "reef", isReef: true, regionId: 2, navigable: true },
             "-3,1":   { terrain: "coast", monumentId: "mon_hue", regionId: 2, navigable: true },
-            "-3,4":   { terrain: "coast", resourceType: "wood", regionId: 2, navigable: true },
-            "-2,3":   { terrain: "coast", isPort: true, portName: "Thương Cảng Tiên Sa (Đà Nẵng)", regionId: 2, navigable: true },
-            "-2,7":   { terrain: "archipelago", archipelagoName: "QUẦN ĐẢO HOÀNG SA", archipelagoSub: "TP. Đà Nẵng • Chủ Quyền Việt Nam", regionId: 2, navigable: false },
+            "-3,9":   { terrain: "archipelago", archipelagoName: "QUẦN ĐẢO HOÀNG SA", archipelagoSub: "TP. Đà Nẵng • Chủ Quyền Việt Nam", regionId: 2, navigable: false },
+            "-2,4":   { terrain: "coast", isPort: true, portName: "Thương Cảng Tiên Sa (Đà Nẵng)", regionId: 2, navigable: true },
             "-1,3":   { terrain: "coast", monumentId: "mon_myson", regionId: 2, navigable: true },
-            "-1,5":   { terrain: "coast", resourceType: "iron", regionId: 2, navigable: true },
-            // Offshore Region 2 Resources & Reefs
-            "-6,7":   { terrain: "sea", resourceType: "iron", regionId: 2, navigable: true, isOffshore: true },
-            "-4,9":   { terrain: "sea", resourceType: "food", regionId: 2, navigable: true, isOffshore: true },
-            "-6,2":   { terrain: "reef", isReef: true, regionId: 2, navigable: true },
-            "-4,3":   { terrain: "reef", isReef: true, regionId: 2, navigable: true },
-            "-1,6":   { terrain: "reef", isReef: true, regionId: 2, navigable: true },
+            "-1,7":   { terrain: "sea", resourceType: "wood", regionId: 2, navigable: true },
 
             // 4. TÂY NGUYÊN & LIÊN KẾT NAM TRUNG BỘ (Region 3)
             "1,5":    { terrain: "coast", isPort: true, portName: "Thương Cảng Liên Vùng Tây Nguyên – Quy Nhơn", regionId: 3, navigable: true },
-            "2,7":    { terrain: "coast", resourceType: "food", regionId: 3, navigable: true },
+            "1,10":   { terrain: "sea", resourceType: "wood", regionId: 3, navigable: true, isOffshore: true },
+            "2,8":    { terrain: "reef", isReef: true, regionId: 3, navigable: true },
             "3,4":    { terrain: "coast", monumentId: "mon_taynguyen", regionId: 3, navigable: true },
-            "4,5":    { terrain: "coast", resourceType: "wood", regionId: 3, navigable: true },
-            // Offshore Region 3 Resources & Reefs
-            "1,9":    { terrain: "sea", resourceType: "wood", regionId: 3, navigable: true, isOffshore: true },
-            "4,9":    { terrain: "sea", resourceType: "iron", regionId: 3, navigable: true, isOffshore: true },
-            "2,5":    { terrain: "reef", isReef: true, regionId: 3, navigable: true },
-            "5,5":    { terrain: "reef", isReef: true, regionId: 3, navigable: true },
+            "4,7":    { terrain: "sea", resourceType: "food", regionId: 3, navigable: true },
+            "4,11":   { terrain: "sea", resourceType: "iron", regionId: 3, navigable: true, isOffshore: true },
 
             // 5. ĐÔNG NAM BỘ (Region 4)
-            "6,2":    { terrain: "coast", resourceType: "iron", regionId: 4, navigable: true },
-            "7,1":    { terrain: "coast", isPort: true, portName: "Thương Cảng Quốc Tế Cái Mép – Sài Gòn", regionId: 4, navigable: true },
-            "7,4":    { terrain: "coast", resourceType: "food", regionId: 4, navigable: true },
+            "5,3":    { terrain: "reef", isReef: true, regionId: 4, navigable: true },
+            "6,2":    { terrain: "coast", isPort: true, portName: "Thương Cảng Quốc Tế Cái Mép – Sài Gòn", regionId: 4, navigable: true },
+            "6,9":    { terrain: "sea", resourceType: "food", regionId: 4, navigable: true, isOffshore: true },
             "8,0":    { terrain: "coast", monumentId: "mon_bennharong", regionId: 4, navigable: true },
-            "8,6":    { terrain: "archipelago", archipelagoName: "QUẦN ĐẢO TRƯỜNG SA", archipelagoSub: "Tỉnh Khánh Hòa • Chủ Quyền Việt Nam", regionId: 4, navigable: false },
-            // Offshore Region 4 Resource & Reef
-            "6,8":    { terrain: "sea", resourceType: "food", regionId: 4, navigable: true, isOffshore: true },
-            "7,3":    { terrain: "reef", isReef: true, regionId: 4, navigable: true },
+            "8,4":    { terrain: "sea", resourceType: "iron", regionId: 4, navigable: true },
+            "8,10":   { terrain: "archipelago", archipelagoName: "QUẦN ĐẢO TRƯỜNG SA", archipelagoSub: "Tỉnh Khánh Hòa • Chủ Quyền Việt Nam", regionId: 4, navigable: false },
 
-            // 6. ĐỒNG BẰNG SÔNG CỬU LONG (Region 5 — Solid Delta Mainland + Coastal POIs)
-            "9,-1":   { terrain: "coast", resourceType: "wood", regionId: 5, navigable: true },
+            // 6. ĐỒNG BẰNG SÔNG CỬU LONG (Region 5)
             "10,-1":  { terrain: "coast", monumentId: "mon_cairang", regionId: 5, navigable: true },
-            "11,-2":  { terrain: "coast", isPort: true, portName: "Thương Cảng Cần Thơ – Cửu Long", regionId: 5, navigable: true },
-            "11,1":   { terrain: "coast", resourceType: "iron", regionId: 5, navigable: true },
-            "12,-3":  { terrain: "coast", resourceType: "food", regionId: 5, navigable: true },
-            // Offshore Region 5 Resource & Reef
-            "11,6":   { terrain: "sea", resourceType: "wood", regionId: 5, navigable: true, isOffshore: true },
-            "10,2":   { terrain: "reef", isReef: true, regionId: 5, navigable: true }
+            "10,4":   { terrain: "reef", isReef: true, regionId: 5, navigable: true },
+            "11,7":   { terrain: "sea", resourceType: "wood", regionId: 5, navigable: true, isOffshore: true },
+            "12,-3":  { terrain: "coast", isPort: true, portName: "Thương Cảng Cần Thơ – Cửu Long", regionId: 5, navigable: true },
+            "13,-1":  { terrain: "coast", resourceType: "food", regionId: 5, navigable: true }
         };
 
         const layoutSpec = [];
@@ -691,9 +455,8 @@ class World3D {
             const rowSpec = this.getVietnamLandRowSpec(r);
             const qCenterOffset = -Math.floor(r / 2);
 
-            // Generate hexes from the western coastal waters across the S-shaped mainland to the East Sea
             const minSeaCol = rowSpec.minCol - 1;
-            const maxSeaCol = 10;
+            const maxSeaCol = 12;
 
             for (let col = minSeaCol; col <= maxSeaCol; col++) {
                 const q = qCenterOffset + col;
@@ -708,7 +471,6 @@ class World3D {
                     this.fairSpawnAnchors.push({ q, r, col, regionId: regId });
                 }
 
-                // STRICT GUARANTEE: Every tile inside `rowSpec.minCol..rowSpec.maxCol` is 100% solid mainland (zero holes!)
                 if (col >= rowSpec.minCol && col <= rowSpec.maxCol) {
                     let mainTerrain = "delta_land";
                     if (regId === 0) mainTerrain = "mountain";
@@ -774,24 +536,22 @@ class World3D {
     }
 
     buildRegionBanners() {
-        // 6 Golden Regional Plaques Placed Around the S-Curve (Matching Reference Image Layout!)
         const regionBanners = [
-            { r: -13, col: -2, line1: "1. TRUNG DU &", line2: "MIỀN NÚI BẮC BỘ", color: "#2d7a36" },
-            { r: -10, col: 0,  line1: "2. ĐỒNG BẰNG", line2: "SÔNG HỒNG", color: "#f5b81c" },
-            { r: -4,  col: -3, line1: "3. DUYÊN HẢI", line2: "MIỀN TRUNG", color: "#5a7f91" },
-            { r: 2,   col: 1,  line1: "4. TÂY NGUYÊN", line2: "CAO NGUYÊN BAZAN", color: "#994920" },
-            { r: 6,   col: -2, line1: "5. ĐÔNG NAM BỘ", line2: "ĐẦU TÀU KINH TẾ", color: "#8a2430" },
-            { r: 11,  col: -6, line1: "6. ĐỒNG BẰNG", line2: "SÔNG CỬU LONG", color: "#659b38" }
+            { r: -13, col: -2, line1: "1. TRUNG DU &", line2: "MIỀN NÚI BẮC BỘ", color: "#4d7c5b" },
+            { r: -10, col: -2, line1: "2. ĐỒNG BẰNG", line2: "SÔNG HỒNG", color: "#d4a84f" },
+            { r: -5,  col: -3, line1: "3. DUYÊN HẢI", line2: "MIỀN TRUNG", color: "#5b8291" },
+            { r: 2,   col: 1,  line1: "4. TÂY NGUYÊN", line2: "CAO NGUYÊN BAZAN", color: "#9e6240" },
+            { r: 6,   col: -2, line1: "5. ĐÔNG NAM BỘ", line2: "ĐẦU TÀU KINH TẾ", color: "#8f4850" },
+            { r: 11,  col: -6, line1: "6. ĐỒNG BẰNG", line2: "SÔNG CỬU LONG", color: "#6d9958" }
         ];
         regionBanners.forEach(rb => {
             const q = -Math.floor(rb.r / 2) + rb.col;
             const { x, z } = this.axialToWorld(q, rb.r);
-            const sprite = ProceduralModels.createRegionBannerSprite(rb.line1, rb.line2, rb.color, 4.8, 1.36);
-            sprite.position.set(x, 3.25, z);
+            const sprite = ProceduralModels.createRegionBannerSprite(rb.line1, rb.line2, rb.color, 2.35, 0.58);
+            sprite.position.set(x, 1.85 * WORLD_SCALE_4X, z);
             this.boardGroup.add(sprite);
         });
 
-        // 3D Nautical Compass Rose in the Western Waters
         const compass = ProceduralModels.createTabletopCompassAndTitlePlaque();
         this.boardGroup.add(compass);
     }
@@ -805,154 +565,122 @@ class World3D {
         const tileSeed = Math.abs((spec.q * 49297) ^ (spec.r * 9301));
         const jitter = ProceduralModels.seededRandom(tileSeed);
 
-        let height = 0.28;
+        let unitHeight = 0.22;
         let topColor = new THREE.Color(region.color);
 
         if (spec.terrain === "sea") {
-            height = 0.14;
+            unitHeight = 0.14;
             const seaDist = Math.max(1, (spec.col || 0) - (spec.maxLandCol !== undefined ? spec.maxLandCol : 0));
             if (spec.isSpawnRim) {
-                topColor = new THREE.Color(0x0891b2);
+                topColor = new THREE.Color(0x2a6680);
             } else if (seaDist <= 2) {
-                topColor = new THREE.Color(0x0284c7);
+                topColor = new THREE.Color(0x265875);
             } else if (seaDist <= 4) {
-                topColor = new THREE.Color(0x0369a1);
+                topColor = new THREE.Color(0x22506b);
             } else {
-                topColor = new THREE.Color(0x075985);
+                topColor = new THREE.Color(0x1e4760);
             }
         } else if (spec.terrain === "coast") {
-            height = 0.22;
-            topColor = new THREE.Color(0x06b6d4).lerp(new THREE.Color(region.color), 0.22);
+            unitHeight = 0.18;
+            topColor = new THREE.Color(0x2b667d).lerp(new THREE.Color(region.color), 0.18);
         } else if (spec.terrain === "river_channel") {
-            height = 0.22;
-            topColor = new THREE.Color(0x0ea5e9);
+            unitHeight = 0.18;
+            topColor = new THREE.Color(0x2d6d86);
         } else if (spec.terrain === "reef") {
-            height = 0.26;
-            topColor = new THREE.Color(0x27272a);
+            unitHeight = 0.20;
+            topColor = new THREE.Color(0x273545);
         } else if (spec.terrain === "archipelago") {
-            height = 0.50;
-            topColor = new THREE.Color(0x0f766e);
+            unitHeight = 0.34;
+            topColor = new THREE.Color(0x2e6b68);
         } else if (spec.terrain === "mountain") {
-            height = 1.32 + jitter * 0.56;
-            topColor.offsetHSL(0, (jitter - 0.5) * 0.05, (jitter - 0.5) * 0.05);
-        } else if (spec.terrain === "highland") {
-            height = 1.08 + jitter * 0.38;
-            topColor.offsetHSL(0, (jitter - 0.5) * 0.05, (jitter - 0.5) * 0.04);
-        } else if (spec.terrain === "southeast_land") {
-            height = 0.78 + jitter * 0.22;
-            topColor.offsetHSL(0, (jitter - 0.5) * 0.04, (jitter - 0.5) * 0.04);
-        } else if (spec.terrain === "coast_land") {
-            height = 0.70 + jitter * 0.20;
-            topColor.offsetHSL(0, (jitter - 0.5) * 0.04, (jitter - 0.5) * 0.04);
-        } else if (spec.terrain === "delta_land") {
-            height = 0.62 + jitter * 0.14;
+            unitHeight = 0.56 + jitter * 0.16;
             topColor.offsetHSL(0, (jitter - 0.5) * 0.03, (jitter - 0.5) * 0.03);
+        } else if (spec.terrain === "highland") {
+            unitHeight = 0.48 + jitter * 0.12;
+            topColor.offsetHSL(0, (jitter - 0.5) * 0.03, (jitter - 0.5) * 0.03);
+        } else if (spec.terrain === "southeast_land") {
+            unitHeight = 0.40 + jitter * 0.08;
+        } else if (spec.terrain === "coast_land") {
+            unitHeight = 0.36 + jitter * 0.06;
+        } else if (spec.terrain === "delta_land") {
+            unitHeight = 0.32 + jitter * 0.05;
         } else if (spec.terrain === "island") {
-            height = 0.48;
+            unitHeight = 0.30;
         } else {
-            height = 0.36;
+            unitHeight = 0.26;
         }
 
+        const height = unitHeight * WORLD_SCALE_4X;
         const isWaterHex = (spec.terrain === "sea" || spec.terrain === "coast" || spec.terrain === "river_channel");
+        const defaultBaseOpacity = spec.terrain === "sea" ? 0.36 : (isWaterHex ? 0.52 : 1.0);
 
-        // Realistic Stratified Terrain Relief for Mainland & Island Hexes:
-        // 1) Sandy Coastal Shelf Skirt at water level so land meets sea naturally
-        if (!isWaterHex && spec.terrain !== "reef") {
-            const sandGeo = new THREE.CylinderGeometry(this.hexRadius * 1.01, this.hexRadius * 1.06, 0.22, 6);
-            const sandMat = new THREE.MeshStandardMaterial({
-                color: 0xdcc08e,
-                roughness: 0.78,
-                metalness: 0.08
-            });
-            const sandSkirt = new THREE.Mesh(sandGeo, sandMat);
-            sandSkirt.position.y = 0.01;
-            sandSkirt.receiveShadow = true;
-            group.add(sandSkirt);
-        }
-
-        const hexGeo = new THREE.CylinderGeometry(this.hexRadius * 0.97, this.hexRadius * 1.01, height, 6);
-        const cliffOrTopColor = isWaterHex ? topColor : topColor.clone().multiplyScalar(0.84);
+        // Single Lightweight Cylinder per Hex (0.90 * hexRadius leaves a clean channel between hexes!)
+        const hexGeo = new THREE.CylinderGeometry(this.hexRadius * 0.88, this.hexRadius * 0.92, height, 6);
         const hexMat = new THREE.MeshStandardMaterial({
-            color: cliffOrTopColor,
-            roughness: isWaterHex ? 0.16 : 0.68,
-            metalness: isWaterHex ? 0.46 : 0.12,
-            transparent: isWaterHex,
-            opacity: spec.terrain === "sea" ? 0.54 : (isWaterHex ? 0.76 : 1.0)
+            color: topColor,
+            roughness: isWaterHex ? 0.48 : 0.72,
+            metalness: isWaterHex ? 0.14 : 0.05,
+            transparent: true,
+            opacity: defaultBaseOpacity
         });
 
         const baseMesh = new THREE.Mesh(hexGeo, hexMat);
-        baseMesh.position.y = height / 2 - 0.1;
-        baseMesh.receiveShadow = true;
-        baseMesh.castShadow = !isWaterHex;
+        baseMesh.position.y = height / 2 - 0.1 * WORLD_SCALE_4X;
         group.add(baseMesh);
+        this.pickableMeshes.push(baseMesh);
 
-        // 2) Beveled Lush Top Plateau Cap on Land Hexes for Realistic 3D Depth
-        if (!isWaterHex && spec.terrain !== "reef") {
-            const capGeo = new THREE.CylinderGeometry(this.hexRadius * 0.91, this.hexRadius * 0.96, 0.09, 6);
-            const capMat = new THREE.MeshStandardMaterial({
-                color: topColor,
-                roughness: 0.50,
-                metalness: 0.10
-            });
-            const capMesh = new THREE.Mesh(capGeo, capMat);
-            capMesh.position.y = height - 0.08;
-            capMesh.receiveShadow = true;
-            capMesh.castShadow = true;
-            group.add(capMesh);
-        }
-
-        const rimGeo = new THREE.RingGeometry(this.hexRadius * 0.88, this.hexRadius * 0.96, 6);
+        const defaultRimOpacity = isWaterHex ? 0.04 : 0.20;
+        const rimGeo = new THREE.RingGeometry(this.hexRadius * 0.82, this.hexRadius * 0.88, 6);
         rimGeo.rotateX(-Math.PI / 2);
         rimGeo.rotateZ(Math.PI / 6);
         const rimColor = spec.terrain === "reef" ? new THREE.Color(0x64748b) : new THREE.Color(region.color);
         const rimMat = new THREE.MeshBasicMaterial({
             color: rimColor,
             transparent: true,
-            opacity: isWaterHex ? 0.04 : 0.28,
+            opacity: defaultRimOpacity,
             side: THREE.DoubleSide
         });
         const rimMesh = new THREE.Mesh(rimGeo, rimMat);
-        rimMesh.position.y = height - 0.09;
+        rimMesh.position.y = height - 0.09 * WORLD_SCALE_4X;
         group.add(rimMesh);
 
-        const hlGeo = new THREE.RingGeometry(this.hexRadius * 0.82, this.hexRadius * 0.98, 6);
+        const hlGeo = new THREE.RingGeometry(this.hexRadius * 0.78, this.hexRadius * 0.90, 6);
         hlGeo.rotateX(-Math.PI / 2);
         hlGeo.rotateZ(Math.PI / 6);
         const hlMat = new THREE.MeshBasicMaterial({
-            color: 0x00f5d4,
+            color: 0x6ee7b7,
             transparent: true,
             opacity: 0.0,
             side: THREE.DoubleSide
         });
         const highlightRing = new THREE.Mesh(hlGeo, hlMat);
-        highlightRing.position.y = height - 0.05;
+        highlightRing.position.y = height - 0.05 * WORLD_SCALE_4X;
         group.add(highlightRing);
 
-        const surfaceY = height - 0.1;
+        const surfaceY = height - 0.1 * WORLD_SCALE_4X;
 
+        let reefPropGroup = null;
         if (spec.terrain === "reef" || spec.isReef) {
-            const reefMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.78, metalness: 0.22 });
-            const coralMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xe11d48, emissiveIntensity: 0.65 });
-            [[-0.45, 0.14, 1.05], [0.42, -0.26, 0.85], [0.08, 0.45, 0.74], [-0.15, -0.35, 0.65]].forEach(([rx, rz, h]) => {
-                const spire = new THREE.Mesh(new THREE.ConeGeometry(0.40, h, 5), reefMat);
-                spire.position.set(rx, surfaceY + h / 2, rz);
-                spire.rotation.z = (rx * 0.25);
-                spire.castShadow = true;
-                group.add(spire);
+            reefPropGroup = new THREE.Group();
+            reefPropGroup.position.y = surfaceY;
+            const reefSub = new THREE.Group();
+            reefSub.scale.setScalar(WORLD_SCALE_4X);
+            const reefMat = new THREE.MeshStandardMaterial({ color: 0x3b4959, roughness: 0.82, metalness: 0.12 });
+            [[-0.48, -0.32, 0.46], [-0.20, -0.46, 0.36]].forEach(([rx, rz, h]) => {
+                const spire = new THREE.Mesh(new THREE.ConeGeometry(0.24, h, 5), reefMat);
+                spire.position.set(rx, h / 2, rz);
+                reefSub.add(spire);
             });
-            const warnRingGeo = new THREE.RingGeometry(0.75, 1.05, 18);
+            const warnRingGeo = new THREE.RingGeometry(0.48, 0.68, 14);
             warnRingGeo.rotateX(-Math.PI / 2);
             const warnRing = new THREE.Mesh(
                 warnRingGeo,
-                new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+                new THREE.MeshBasicMaterial({ color: 0xe06c75, transparent: true, opacity: 0.38, side: THREE.DoubleSide })
             );
-            warnRing.position.y = surfaceY + 0.04;
-            group.add(warnRing);
-
-            const warnOrb = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), coralMat);
-            warnOrb.position.set(0, surfaceY + 1.25, 0);
-            group.add(warnOrb);
-            this.animatedLandProps.push({ type: "spin_y", mesh: warnOrb, speed: 2.4 });
+            warnRing.position.set(-0.35, 0.03, -0.35);
+            reefSub.add(warnRing);
+            reefPropGroup.add(reefSub);
+            group.add(reefPropGroup);
         } else if (!spec.navigable) {
             if (spec.terrain === "archipelago" && spec.archipelagoName) {
                 const archModel = ProceduralModels.createSovereigntyArchipelago(
@@ -971,13 +699,6 @@ class World3D {
             group.add(buoy);
         }
 
-        // Respect current cloud visibility setting for mountain clouds
-        if (!this.cloudsVisible) {
-            this.animatedLandProps.forEach(item => {
-                if (item.type === "orbit_cloud" && item.mesh) item.mesh.visible = false;
-            });
-        }
-
         const tileObj = {
             index,
             q: spec.q,
@@ -985,6 +706,8 @@ class World3D {
             x,
             z,
             height,
+            defaultBaseOpacity,
+            defaultRimOpacity,
             regionId: spec.regionId,
             region,
             terrain: spec.terrain,
@@ -1005,8 +728,10 @@ class World3D {
             hasNPC: false,
             group,
             baseMesh,
+            rimMesh,
             highlightRing,
-            propModel: null,
+            propModel: reefPropGroup,
+            propMeshes: [],
             labelSprite: null
         };
 
@@ -1022,75 +747,40 @@ class World3D {
             group.add(monModel);
             tileObj.propModel = monModel;
 
-            // Radiant Monument Sky Beacon + Double Magic Halo Rings + Orbiting Crystals
-            // Makes Monuments unmistakably luminous from anywhere on the map!
-            const tierHexColors = { 1: 0x34d399, 2: 0xfbbf24, 3: 0xf43f5e };
-            const glowHex = tierHexColors[tier] || 0xfbbf24;
+            const tierHexColors = { 1: 0x52b788, 2: 0xe0a943, 3: 0xe06c75 };
+            const glowHex = tierHexColors[tier] || 0xe0a943;
             const glowGroup = new THREE.Group();
             glowGroup.position.y = surfaceY;
 
-            const outerHaloGeo = new THREE.RingGeometry(this.hexRadius * 0.92, this.hexRadius * 1.18, 24);
+            const outerHaloGeo = new THREE.RingGeometry(this.hexRadius * 0.80, this.hexRadius * 0.94, 6);
             outerHaloGeo.rotateX(-Math.PI / 2);
+            outerHaloGeo.rotateZ(Math.PI / 6);
             const outerHalo = new THREE.Mesh(
                 outerHaloGeo,
-                new THREE.MeshBasicMaterial({ color: glowHex, transparent: true, opacity: 0.72, side: THREE.DoubleSide })
+                new THREE.MeshBasicMaterial({ color: glowHex, transparent: true, opacity: 0.45, side: THREE.DoubleSide })
             );
-            outerHalo.position.y = 0.06;
+            outerHalo.position.y = 0.04 * WORLD_SCALE_4X;
             glowGroup.add(outerHalo);
 
-            const innerHaloGeo = new THREE.RingGeometry(this.hexRadius * 0.56, this.hexRadius * 0.78, 6);
-            innerHaloGeo.rotateX(-Math.PI / 2);
-            const innerHalo = new THREE.Mesh(
-                innerHaloGeo,
-                new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65, side: THREE.DoubleSide })
-            );
-            innerHalo.position.y = 0.09;
-            glowGroup.add(innerHalo);
-
-            const skyBeamGeo = new THREE.CylinderGeometry(0.26, 1.05, 5.8, 16, 1, true);
-            const skyBeamMat = new THREE.MeshBasicMaterial({
-                color: glowHex,
-                transparent: true,
-                opacity: 0.24,
-                side: THREE.DoubleSide,
-                depthWrite: false
-            });
-            const skyBeam = new THREE.Mesh(skyBeamGeo, skyBeamMat);
-            skyBeam.position.y = 2.9;
-            glowGroup.add(skyBeam);
-
-            const orbitOrbsGroup = new THREE.Group();
-            orbitOrbsGroup.position.y = 1.45;
-            for (let oi = 0; oi < 3; oi++) {
-                const ang = (oi / 3) * Math.PI * 2;
-                const orb = new THREE.Mesh(
-                    new THREE.OctahedronGeometry(0.18, 0),
-                    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: glowHex, emissiveIntensity: 1.1 })
-                );
-                orb.position.set(Math.cos(ang) * 1.25, 0, Math.sin(ang) * 1.25);
-                orbitOrbsGroup.add(orb);
-            }
-            glowGroup.add(orbitOrbsGroup);
-
-            glowGroup.userData = { outerHalo, innerHalo, skyBeam, orbitOrbsGroup, baseColor: glowHex };
+            glowGroup.userData = { outerHalo, baseColor: glowHex };
             group.add(glowGroup);
             tileObj.monumentGlowGroup = glowGroup;
 
-            const tierReqLabel = {
-                1: "★ Cấp 1 (Dễ - Tối đa 1 lần): Cần 1 Key 1 + 1 Lúa + 2 Xu",
-                2: "★★ Cấp 2 (Vừa): Cần 1 Key 2 + 2 Lúa + 3 Xu",
-                3: "★★★ Cấp 3 (Khó): Cần 1 Key 3 + 3 Lúa + 1 Sắt + 6 Xu"
+            const tierShortLabel = {
+                1: "★ Cấp 1 (Dễ)",
+                2: "★★ Cấp 2 (Vừa)",
+                3: "★★★ Cấp 3 (Khó)"
             };
-            const tierColors = { 1: "#34d399", 2: "#fbbf24", 3: "#f87171" };
+            const tierColors = { 1: "#2d7a4d", 2: "#b4781e", 3: "#b83b3b" };
             const sprite = ProceduralModels.createLabelCanvas(
-                `✨🏛️ ${monData.name}`,
-                tierReqLabel[tier],
-                "rgba(11, 19, 30, 0.95)",
+                `🏛️ ${monData.name}`,
+                tierShortLabel[tier],
+                "rgba(244, 233, 207, 0.94)",
                 tierColors[tier],
-                4.6,
-                1.36
+                2.05,
+                0.48
             );
-            sprite.position.set(0, surfaceY + 3.45, 0);
+            sprite.position.set(-0.40 * WORLD_SCALE_4X, surfaceY + 1.65 * WORLD_SCALE_4X, -0.36 * WORLD_SCALE_4X);
             group.add(sprite);
             tileObj.labelSprite = sprite;
 
@@ -1102,13 +792,13 @@ class World3D {
 
             const sprite = ProceduralModels.createLabelCanvas(
                 `⚓ ${spec.portName}`,
-                `${region.specialty.icon} ${region.specialty.shortName} • Lúa/Gỗ/Sắt • 1 Key`,
-                "rgba(11, 19, 30, 0.90)",
+                `${region.specialty.icon} ${region.specialty.shortName}`,
+                "rgba(244, 233, 207, 0.94)",
                 region.color,
-                3.9,
-                1.14
+                2.00,
+                0.46
             );
-            sprite.position.set(0, surfaceY + 2.35, 0);
+            sprite.position.set(-0.40 * WORLD_SCALE_4X, surfaceY + 1.48 * WORLD_SCALE_4X, -0.36 * WORLD_SCALE_4X);
             group.add(sprite);
             tileObj.labelSprite = sprite;
 
@@ -1117,51 +807,35 @@ class World3D {
             resModel.position.y = surfaceY;
             group.add(resModel);
             tileObj.propModel = resModel;
-
-            const prefix = spec.isOffshore ? "🌊 Biển Xa: " : "";
-            const resNames = {
-                food: { title: `🌾 ${prefix}Vựa Lúa & Ngư Trường`, sub: "Khai thác nhận +1~2 Lúa" },
-                wood: { title: `🌲 ${prefix}Lâm Trường & Gỗ Quý`, sub: "Khai thác nhận +1~2 Gỗ" },
-                iron: { title: `⛏️ ${prefix}Mỏ Khoáng Sản Sắt`, sub: "Khai thác nhận +1~2 Sắt" }
-            };
-            const rInfo = resNames[spec.resourceType];
-            const sprite = ProceduralModels.createLabelCanvas(
-                rInfo.title,
-                rInfo.sub,
-                "rgba(11, 19, 30, 0.88)",
-                spec.isOffshore ? "#22d3ee" : "#38bdf8",
-                3.4,
-                1.04
-            );
-            sprite.position.set(0, surfaceY + 2.05, 0);
-            group.add(sprite);
-            tileObj.labelSprite = sprite;
-        } else if (tileObj.isReef) {
-            const sprite = ProceduralModels.createLabelCanvas(
-                "⚠️ Bãi Đá Ngầm",
-                "Đi qua bị -1 ❤️ HP (Nhấp đúp giữ kéo để né)",
-                "rgba(45, 10, 20, 0.92)",
-                "#fb7185",
-                3.4,
-                0.98
-            );
-            sprite.position.set(0, surfaceY + 1.85, 0);
-            group.add(sprite);
-            tileObj.labelSprite = sprite;
         }
 
-        // Tag all 3D meshes inside navigable tiles (Ports, Monuments, Resources, Buoys)
-        // so clicking any part of the 3D building/boat accurately picks that navigable tile!
-        if (tileObj.navigable) {
-            group.traverse(child => {
-                if (child.isMesh) {
-                    child.userData = child.userData || {};
-                    child.userData.tile = tileObj;
-                }
-            });
+        // Cache propModel meshes so we can smoothly fade the tile's 3D model when a ship enters the tile!
+        if (tileObj.propModel) {
+            this.cacheTilePropMeshes(tileObj);
         }
 
         return tileObj;
+    }
+
+    cacheTilePropMeshes(tileObj) {
+        tileObj.propMeshes = [];
+        if (!tileObj.propModel) return;
+        tileObj.propModel.traverse(child => {
+            if (child.isMesh && child.material) {
+                // Clone shared material if needed so fading one tile never fades another tile
+                child.material = child.material.clone();
+                child.material.userData = child.material.userData || {};
+                if (child.material.userData.baseOpacity === undefined) {
+                    child.material.userData.baseOpacity = child.material.opacity !== undefined ? child.material.opacity : 1.0;
+                }
+                child.userData = child.userData || {};
+                child.userData.tile = tileObj;
+                tileObj.propMeshes.push(child);
+                if (tileObj.navigable) {
+                    this.pickableMeshes.push(child);
+                }
+            }
+        });
     }
 
     despawnRareNPC() {
@@ -1171,6 +845,7 @@ class World3D {
         if (t.propModel) {
             t.group.remove(t.propModel);
             t.propModel = null;
+            t.propMeshes = [];
         }
         if (t.labelSprite) {
             t.group.remove(t.labelSprite);
@@ -1187,47 +862,55 @@ class World3D {
             !t.monumentId &&
             !t.isPort &&
             !t.resourceType &&
+            !t.isReef &&
             !t.isSpawnRim
         );
         if (seaCandidates.length === 0) return null;
 
         const chosen = seaCandidates[Math.floor(Math.random() * seaCandidates.length)];
         chosen.hasNPC = true;
-        const surfaceY = chosen.height - 0.1;
+        const surfaceY = chosen.height - 0.1 * WORLD_SCALE_4X;
 
-        const npcModel = ProceduralModels.createNPCharacterModel("#38bdf8", false);
-        npcModel.position.y = surfaceY;
-        npcModel.scale.setScalar(1.6);
-        npcModel.traverse(child => {
-            if (child.isMesh) {
-                child.userData = child.userData || {};
-                child.userData.tile = chosen;
-            }
-        });
+        const npcModel = ProceduralModels.createNPCharacterModel("#5ea8c8", false);
+        npcModel.position.set(-0.38 * WORLD_SCALE_4X, surfaceY, -0.34 * WORLD_SCALE_4X);
         chosen.group.add(npcModel);
         chosen.propModel = npcModel;
+        this.cacheTilePropMeshes(chosen);
 
         const sprite = ProceduralModels.createLabelCanvas(
-            "🧙‍♂️ Tiên Ông Rìu Vàng (Hiếm)",
-            "Giải đố nhận +2~3 Xu Vàng!",
-            "rgba(11, 19, 30, 0.94)",
-            "#fde047",
-            3.5,
-            1.08
+            "🧙‍♂️ Tiên Ông Rìu Vàng",
+            "Giải đố +2~3 Xu",
+            "rgba(244, 233, 207, 0.94)",
+            "#b4781e",
+            2.00,
+            0.46
         );
-        sprite.position.set(0, surfaceY + 2.25, 0);
+        sprite.position.set(-0.38 * WORLD_SCALE_4X, surfaceY + 1.55 * WORLD_SCALE_4X, -0.34 * WORLD_SCALE_4X);
         chosen.group.add(sprite);
         chosen.labelSprite = sprite;
 
         this.activeNPCTile = chosen;
-        this.triggerBurstAnimation(chosen.q, chosen.r, 0xfde047, 24);
+        this.triggerBurstAnimation(chosen.q, chosen.r, 0xe6c15a, 12);
         return chosen;
     }
 
     // ------------------------------------------------------------------------
-    // PLAYER SHIPS — IMMUTABLE SHIP KEY MAPPING & LOCAL PLAYER ARROW MARKER
-    // Fixes perspective/ship-name swap bug permanently!
+    // PLAYER SHIPS — CLEAR HARBOR BERTH & OCCUPIED-TILE FADE / SHIP SPOTLIGHT
     // ------------------------------------------------------------------------
+    getShipDockPositionOnTile(tile, player, playerIdx = 0, totalPlayers = 1) {
+        const hasLandmark = Boolean(tile.monumentId || tile.isPort || tile.resourceType || tile.isReef || tile.hasNPC);
+        const berthOffsetX = (hasLandmark ? 0.26 : 0) * WORLD_SCALE_4X;
+        const berthOffsetZ = (hasLandmark ? 0.24 : 0) * WORLD_SCALE_4X;
+        const seatOrIdx = (player && player.seatIndex !== undefined) ? player.seatIndex : playerIdx;
+        const angle = (seatOrIdx / Math.max(1, totalPlayers)) * Math.PI * 2;
+        const multiRadius = (totalPlayers > 1 ? 0.26 : 0) * WORLD_SCALE_4X;
+        return new THREE.Vector3(
+            tile.x + berthOffsetX + Math.cos(angle) * multiRadius,
+            tile.height + 0.08 * WORLD_SCALE_4X,
+            tile.z + berthOffsetZ + Math.sin(angle) * multiRadius
+        );
+    }
+
     spawnShips(players, localPlayer = null) {
         this.shipMeshes.forEach(mesh => this.scene.remove(mesh));
         this.shipMeshes.clear();
@@ -1263,7 +946,6 @@ class World3D {
 
         const localKey = localPlayer ? World3D.getPlayerShipKey(localPlayer) : null;
 
-        // Verify that every player's shipKey, name, archetypeId, and local marker match 100%
         const needsRebuild = players.some((p, idx) => {
             const shipKey = World3D.getPlayerShipKey(p, idx);
             const mesh = this.shipMeshes.get(shipKey);
@@ -1305,14 +987,8 @@ class World3D {
 
         shipMesh.userData.lastQ = q;
         shipMesh.userData.lastR = r;
-        const seatOrIdx = player.seatIndex !== undefined ? player.seatIndex : playerIdx;
-        const angle = (seatOrIdx / Math.max(1, totalPlayers)) * Math.PI * 2;
-        const offsetRadius = totalPlayers > 1 ? 0.36 : 0;
-        shipMesh.position.set(
-            tile.x + Math.cos(angle) * offsetRadius,
-            tile.height - 0.05,
-            tile.z + Math.sin(angle) * offsetRadius
-        );
+        const dockPos = this.getShipDockPositionOnTile(tile, player, playerIdx, totalPlayers);
+        shipMesh.position.copy(dockPos);
     }
 
     animateShipAlongPath(player, pathTiles, playerIdx = 0, totalPlayers = 1, onComplete = null) {
@@ -1326,22 +1002,24 @@ class World3D {
         shipMesh.userData.lastR = player.r;
 
         this.clearPathPreview();
-        const seatOrIdx = player.seatIndex !== undefined ? player.seatIndex : playerIdx;
-        const angle = (seatOrIdx / Math.max(1, totalPlayers)) * Math.PI * 2;
-        const offsetRadius = totalPlayers > 1 ? 0.36 : 0;
 
         const waypoints = [shipMesh.position.clone()];
         pathTiles.forEach((t, idx) => {
             const isLast = (idx === pathTiles.length - 1);
-            waypoints.push(new THREE.Vector3(
-                t.x + (isLast ? Math.cos(angle) * offsetRadius : 0),
-                t.height - 0.05,
-                t.z + (isLast ? Math.sin(angle) * offsetRadius : 0)
-            ));
+            if (isLast) {
+                waypoints.push(this.getShipDockPositionOnTile(t, player, playerIdx, totalPlayers));
+            } else {
+                const hasLandmark = Boolean(t.monumentId || t.isPort || t.resourceType || t.isReef || t.hasNPC);
+                waypoints.push(new THREE.Vector3(
+                    t.x + (hasLandmark ? 0.22 * WORLD_SCALE_4X : 0),
+                    t.height + 0.08 * WORLD_SCALE_4X,
+                    t.z + (hasLandmark ? 0.20 * WORLD_SCALE_4X : 0)
+                ));
+            }
         });
 
         let segIndex = 0;
-        const segDuration = 290;
+        const segDuration = 280;
 
         const runNextSegment = () => {
             if (segIndex >= waypoints.length - 1) {
@@ -1374,12 +1052,8 @@ class World3D {
                 shipMesh.rotation.y = startRotY + deltaAngle * Math.min(1, t * 1.65);
 
                 if (shipMesh.userData.mainSail) {
-                    const swell = 1.0 + Math.sin(t * Math.PI) * 0.16;
+                    const swell = 1.0 + Math.sin(t * Math.PI) * 0.14;
                     shipMesh.userData.mainSail.scale.set(swell, 1.0, swell);
-                }
-
-                if (Math.random() < 0.58) {
-                    this.spawnWakeParticle(shipMesh.position.x, shipMesh.position.y, shipMesh.position.z);
                 }
 
                 if (t < 1) {
@@ -1402,36 +1076,37 @@ class World3D {
         this.clearPathPreview();
         if (!pathTiles || pathTiles.length === 0) return;
 
-        const accentColor = isCustomDrawn ? 0x00f5d4 : 0xfde047;
+        const accentColor = isCustomDrawn ? 0x6ee7b7 : 0xe6c15a;
         const points = [];
         pathTiles.forEach((t, idx) => {
-            points.push(new THREE.Vector3(t.x, t.height + 0.28, t.z));
+            const py = t.height + 0.22 * WORLD_SCALE_4X;
+            points.push(new THREE.Vector3(t.x, py, t.z));
             const dot = new THREE.Mesh(
-                new THREE.SphereGeometry(isCustomDrawn ? 0.28 : 0.22, 12, 12),
+                new THREE.SphereGeometry((isCustomDrawn ? 0.22 : 0.16) * WORLD_SCALE_4X, 10, 10),
                 new THREE.MeshBasicMaterial({ color: accentColor })
             );
-            dot.position.set(t.x, t.height + 0.28, t.z);
+            dot.position.set(t.x, py, t.z);
             this.pathPreviewGroup.add(dot);
 
             if (idx > 0 || isCustomDrawn) {
-                const ringGeo = new THREE.RingGeometry(this.hexRadius * 0.68, this.hexRadius * 0.88, 6);
+                const ringGeo = new THREE.RingGeometry(this.hexRadius * 0.68, this.hexRadius * 0.84, 6);
                 ringGeo.rotateX(-Math.PI / 2);
                 ringGeo.rotateY(Math.PI / 6);
                 const ringMat = new THREE.MeshBasicMaterial({
                     color: accentColor,
                     side: THREE.DoubleSide,
                     transparent: true,
-                    opacity: isCustomDrawn ? 0.92 : 0.65
+                    opacity: isCustomDrawn ? 0.85 : 0.55
                 });
                 const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-                ringMesh.position.set(t.x, t.height + 0.12, t.z);
+                ringMesh.position.set(t.x, t.height + 0.08 * WORLD_SCALE_4X, t.z);
                 this.pathPreviewGroup.add(ringMesh);
             }
         });
 
         if (points.length >= 2) {
             const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-            const lineMat = new THREE.LineBasicMaterial({ color: accentColor, linewidth: 3 });
+            const lineMat = new THREE.LineBasicMaterial({ color: accentColor, linewidth: 2 });
             const line = new THREE.Line(lineGeo, lineMat);
             this.pathPreviewGroup.add(line);
         }
@@ -1444,48 +1119,46 @@ class World3D {
     }
 
     spawnWakeParticle(x, y, z) {
-        const geo = new THREE.RingGeometry(0.12, 0.34, 12);
+        const geo = new THREE.RingGeometry(0.12 * WORLD_SCALE_4X, 0.28 * WORLD_SCALE_4X, 10);
         geo.rotateX(-Math.PI / 2);
-        const mat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.78, side: THREE.DoubleSide });
+        const mat = new THREE.MeshBasicMaterial({ color: 0xcbd5e1, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
         const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(x, y + 0.02, z);
+        mesh.position.set(x, y + 0.02 * WORLD_SCALE_4X, z);
         this.effectsGroup.add(mesh);
 
         this.floatingEffects.push({
             mesh,
             type: "wake",
             birth: performance.now(),
-            life: 680
+            life: 580
         });
     }
 
-    triggerBurstAnimation(q, r, colorHex = 0xfacc15, count = 18) {
+    triggerBurstAnimation(q, r, colorHex = 0xe6c15a, count = 10) {
         const tile = this.hexMap.get(`${q},${r}`);
         if (!tile) return;
 
         for (let i = 0; i < count; i++) {
-            const geo = new THREE.OctahedronGeometry(0.18, 0);
-            const mat = new THREE.MeshStandardMaterial({
+            const geo = new THREE.OctahedronGeometry(0.14 * WORLD_SCALE_4X, 0);
+            const mat = new THREE.MeshBasicMaterial({
                 color: colorHex,
-                emissive: colorHex,
-                emissiveIntensity: 0.75,
                 transparent: true,
-                opacity: 1
+                opacity: 0.90
             });
             const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(tile.x, tile.height + 0.6, tile.z);
+            mesh.position.set(tile.x, tile.height + 0.5 * WORLD_SCALE_4X, tile.z);
             this.effectsGroup.add(mesh);
 
             const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4;
-            const speed = 1.4 + Math.random() * 2.1;
+            const speed = (1.2 + Math.random() * 1.5) * WORLD_SCALE_4X;
             this.floatingEffects.push({
                 mesh,
                 type: "burst",
                 vx: Math.cos(angle) * speed,
-                vy: 2.5 + Math.random() * 2.2,
+                vy: (2.0 + Math.random() * 1.5) * WORLD_SCALE_4X,
                 vz: Math.sin(angle) * speed,
                 birth: performance.now(),
-                life: 1100
+                life: 850
             });
         }
     }
@@ -1497,7 +1170,7 @@ class World3D {
         const endTarget = new THREE.Vector3(tile.x, 0, tile.z);
         const camOffset = this.camera.position.clone().sub(startTarget);
         const startTime = performance.now();
-        const duration = 520;
+        const duration = 500;
 
         const animateCam = (now) => {
             const t = Math.min(1, (now - startTime) / duration);
@@ -1516,8 +1189,8 @@ class World3D {
             if (this.hoveredHex === tile) {
                 const key = `${tile.q},${tile.r}`;
                 if (this.reachablePaths && this.reachablePaths.has(key)) {
-                    tile.highlightRing.material.color.setHex(0x00f5d4);
-                    tile.highlightRing.material.opacity = 0.95;
+                    tile.highlightRing.material.color.setHex(0x6ee7b7);
+                    tile.highlightRing.material.opacity = 0.85;
                 } else {
                     tile.highlightRing.material.opacity = 0.0;
                 }
@@ -1531,39 +1204,18 @@ class World3D {
         this.hexTiles.forEach(tile => {
             if (tile.resourceType && tile.propModel) {
                 const depleted = tile.resourceCooldown > 0;
-                tile.propModel.scale.setScalar(depleted ? 0.55 : 1.22);
-                tile.propModel.position.y = (tile.height - 0.1) - (depleted ? 0.12 : 0);
+                tile.propModel.position.y = (tile.height - 0.1 * WORLD_SCALE_4X) - (depleted ? 0.08 * WORLD_SCALE_4X : 0);
 
-                // Storm-restricted resource node indicator during Giông Bão
                 if (tile.stormRestricted && !tile.stormRestrictGroup) {
                     const restrictGroup = new THREE.Group();
-                    restrictGroup.position.y = tile.height - 0.05;
-                    const barRingGeo = new THREE.RingGeometry(0.95, 1.32, 24);
+                    restrictGroup.position.y = tile.height - 0.05 * WORLD_SCALE_4X;
+                    const barRingGeo = new THREE.RingGeometry(this.hexRadius * 0.72, this.hexRadius * 0.88, 18);
                     barRingGeo.rotateX(-Math.PI / 2);
                     const barRing = new THREE.Mesh(
                         barRingGeo,
-                        new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+                        new THREE.MeshBasicMaterial({ color: 0xe06c75, transparent: true, opacity: 0.65, side: THREE.DoubleSide })
                     );
                     restrictGroup.add(barRing);
-
-                    const domeGeo = new THREE.CylinderGeometry(1.18, 1.18, 1.9, 16, 1, true);
-                    const dome = new THREE.Mesh(
-                        domeGeo,
-                        new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false })
-                    );
-                    dome.position.y = 0.95;
-                    restrictGroup.add(dome);
-
-                    const badge = ProceduralModels.createLabelCanvas(
-                        "⛔ BÃO CẤM VÀO",
-                        "Giông Bão phong tỏa mỏ",
-                        "rgba(127, 29, 29, 0.96)",
-                        "#fca5a5",
-                        3.1,
-                        0.92
-                    );
-                    badge.position.set(0, 2.85, 0);
-                    restrictGroup.add(badge);
 
                     tile.group.add(restrictGroup);
                     tile.stormRestrictGroup = restrictGroup;
@@ -1575,42 +1227,36 @@ class World3D {
         });
     }
 
-    // ------------------------------------------------------------------------
-    // 3D LIGHTNING STRIKE & MONUMENT TRAP ANIMATIONS (ARROW / BOULDER / LIGHTNING)
-    // ------------------------------------------------------------------------
     triggerLightningStrikeEffect(q, r) {
         const tile = this.hexMap.get(`${q},${r}`);
         if (!tile) return;
 
-        // 1. Jagged 3D Sky Lightning Bolt
         const boltGroup = new THREE.Group();
         boltGroup.position.set(tile.x, tile.height, tile.z);
         const boltPts = [];
-        const segs = 10;
+        const segs = 8;
         for (let i = 0; i <= segs; i++) {
-            const y = (1 - i / segs) * 26;
-            const jx = (i === 0 || i === segs) ? 0 : (Math.random() - 0.5) * 2.2;
-            const jz = (i === 0 || i === segs) ? 0 : (Math.random() - 0.5) * 2.2;
+            const y = (1 - i / segs) * 24 * WORLD_SCALE_4X;
+            const jx = (i === 0 || i === segs) ? 0 : (Math.random() - 0.5) * 2.0 * WORLD_SCALE_4X;
+            const jz = (i === 0 || i === segs) ? 0 : (Math.random() - 0.5) * 2.0 * WORLD_SCALE_4X;
             boltPts.push(new THREE.Vector3(jx, y, jz));
         }
         const boltGeo = new THREE.BufferGeometry().setFromPoints(boltPts);
-        const boltMat = new THREE.LineBasicMaterial({ color: 0xe0f2fe, linewidth: 4, transparent: true, opacity: 1.0 });
+        const boltMat = new THREE.LineBasicMaterial({ color: 0xe0f2fe, linewidth: 3, transparent: true, opacity: 1.0 });
         const boltLine = new THREE.Line(boltGeo, boltMat);
         boltGroup.add(boltLine);
 
-        // Glowing plasma core cylinder along the strike column
-        const beamGeo = new THREE.CylinderGeometry(0.18, 0.55, 25, 8);
-        const beamMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72 });
+        const beamGeo = new THREE.CylinderGeometry(0.16 * WORLD_SCALE_4X, 0.45 * WORLD_SCALE_4X, 24 * WORLD_SCALE_4X, 6);
+        const beamMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.68 });
         const beamMesh = new THREE.Mesh(beamGeo, beamMat);
-        beamMesh.position.y = 12.5;
+        beamMesh.position.y = 12 * WORLD_SCALE_4X;
         boltGroup.add(beamMesh);
 
-        // Shockwave ring on water/land surface
-        const ringGeo = new THREE.RingGeometry(0.3, 0.9, 24);
+        const ringGeo = new THREE.RingGeometry(0.3 * WORLD_SCALE_4X, 0.9 * WORLD_SCALE_4X, 18);
         ringGeo.rotateX(-Math.PI / 2);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.90, side: THREE.DoubleSide });
         const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-        ringMesh.position.y = 0.15;
+        ringMesh.position.y = 0.12 * WORLD_SCALE_4X;
         boltGroup.add(ringMesh);
 
         this.effectsGroup.add(boltGroup);
@@ -1621,10 +1267,10 @@ class World3D {
             ringMat,
             type: "lightning_bolt",
             birth: performance.now(),
-            life: 850
+            life: 800
         });
 
-        this.triggerBurstAnimation(q, r, 0x38bdf8, 26);
+        this.triggerBurstAnimation(q, r, 0x38bdf8, 12);
     }
 
     triggerMonumentTrapEffect(q, r, tier = 1) {
@@ -1632,66 +1278,62 @@ class World3D {
         if (!tile) return;
 
         if (tier === 1) {
-            // Tier 1 (Easy): Bẫy Mũi Tên (Volley of 10 glowing red-tipped arrows raining down!)
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 6; i++) {
                 const arrowGroup = new THREE.Group();
                 const shaft = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.04, 0.04, 1.35, 6),
-                    new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.6 })
+                    new THREE.CylinderGeometry(0.04 * WORLD_SCALE_4X, 0.04 * WORLD_SCALE_4X, 1.2 * WORLD_SCALE_4X, 5),
+                    new THREE.MeshBasicMaterial({ color: 0x78350f })
                 );
                 const tip = new THREE.Mesh(
-                    new THREE.ConeGeometry(0.12, 0.35, 6),
-                    new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xdc2626, emissiveIntensity: 0.85 })
+                    new THREE.ConeGeometry(0.12 * WORLD_SCALE_4X, 0.32 * WORLD_SCALE_4X, 5),
+                    new THREE.MeshBasicMaterial({ color: 0xef4444 })
                 );
-                tip.position.y = -0.75;
+                tip.position.y = -0.68 * WORLD_SCALE_4X;
                 tip.rotation.x = Math.PI;
-                arrowGroup.add(shaft);
-                arrowGroup.add(tip);
+                arrowGroup.add(shaft, tip);
 
-                const ox = (Math.random() - 0.5) * 1.9;
-                const oz = (Math.random() - 0.5) * 1.9;
-                arrowGroup.position.set(tile.x + ox, tile.height + 7.5 + i * 0.45, tile.z + oz);
+                const ox = (Math.random() - 0.5) * 1.6 * WORLD_SCALE_4X;
+                const oz = (Math.random() - 0.5) * 1.6 * WORLD_SCALE_4X;
+                arrowGroup.position.set(tile.x + ox, tile.height + (6.5 + i * 0.4) * WORLD_SCALE_4X, tile.z + oz);
                 this.effectsGroup.add(arrowGroup);
 
                 this.floatingEffects.push({
                     mesh: arrowGroup,
                     type: "trap_arrow",
-                    targetY: tile.height + 0.45,
-                    vy: -14.5,
+                    targetY: tile.height + 0.4 * WORLD_SCALE_4X,
+                    vy: -14.0 * WORLD_SCALE_4X,
                     birth: performance.now(),
-                    life: 1250
+                    life: 1150
                 });
             }
-            this.triggerBurstAnimation(q, r, 0xef4444, 18);
+            this.triggerBurstAnimation(q, r, 0xef4444, 12);
         } else if (tier === 2) {
-            // Tier 2 (Medium): Bẫy Đá Lăn (4 giant jagged boulders crashing and tumbling across the Monument!)
-            for (let i = 0; i < 4; i++) {
+            for (let i = 0; i < 3; i++) {
                 const boulder = new THREE.Mesh(
-                    new THREE.DodecahedronGeometry(0.52, 0),
-                    new THREE.MeshStandardMaterial({ color: 0x57534e, roughness: 0.88, metalness: 0.15 })
+                    new THREE.DodecahedronGeometry(0.46 * WORLD_SCALE_4X, 0),
+                    new THREE.MeshStandardMaterial({ color: 0x57534e, roughness: 0.85 })
                 );
-                const angle = (i / 4) * Math.PI * 2;
+                const angle = (i / 3) * Math.PI * 2;
                 boulder.position.set(
-                    tile.x + Math.cos(angle) * 1.6,
-                    tile.height + 4.8 + i * 0.5,
-                    tile.z + Math.sin(angle) * 1.6
+                    tile.x + Math.cos(angle) * 1.4 * WORLD_SCALE_4X,
+                    tile.height + (4.2 + i * 0.4) * WORLD_SCALE_4X,
+                    tile.z + Math.sin(angle) * 1.4 * WORLD_SCALE_4X
                 );
                 this.effectsGroup.add(boulder);
 
                 this.floatingEffects.push({
                     mesh: boulder,
                     type: "trap_boulder",
-                    vx: -Math.cos(angle) * 1.6,
-                    vy: -6.5,
-                    vz: -Math.sin(angle) * 1.6,
-                    floorY: tile.height + 0.42,
+                    vx: -Math.cos(angle) * 1.4 * WORLD_SCALE_4X,
+                    vy: -6.0 * WORLD_SCALE_4X,
+                    vz: -Math.sin(angle) * 1.4 * WORLD_SCALE_4X,
+                    floorY: tile.height + 0.4 * WORLD_SCALE_4X,
                     birth: performance.now(),
-                    life: 1450
+                    life: 1300
                 });
             }
-            this.triggerBurstAnimation(q, r, 0xf97316, 24);
+            this.triggerBurstAnimation(q, r, 0xf97316, 14);
         } else {
-            // Tier 3 (Hard): Bẫy Sét Đánh & Đá Lăn (Combined Lightning Bolt + Crashing Boulders!)
             this.triggerLightningStrikeEffect(q, r);
             this.triggerMonumentTrapEffect(q, r, 2);
         }
@@ -1710,18 +1352,16 @@ class World3D {
         let pointerDownTile = null;
         let isLeftPointerDown = false;
         let lastTapTime = 0;
-        let lastTapTileKey = null;
+        let lastHoverRaycastTime = 0;
         this.singleClickTimer = null;
         this.isDrawingCustomPath = false;
         this.isClickDrawMode = false;
         this.hasDraggedToOtherHex = false;
 
-        // Prevent context menu on right-click so right-click smoothly rotates the 3D camera
         this.renderer.domElement.addEventListener("contextmenu", (e) => {
             e.preventDefault();
         });
 
-        // W A S D (and Arrow keys) camera panning state
         this.keyState = { w: false, a: false, s: false, d: false };
         const updateKeyState = (e, isDown) => {
             if (isDown && e.target) {
@@ -1749,32 +1389,25 @@ class World3D {
             this.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
             this.raycaster.setFromCamera(this.mouse, this.camera);
-            // Raycast recursively against boardGroup so clicking 3D Port/Monument/Resource models or water hexes works!
-            const rawHits = this.raycaster.intersectObjects(this.boardGroup.children, true);
-            const tileHits = [];
-            for (let i = 0; i < rawHits.length; i++) {
-                const obj = rawHits[i].object;
-                if (obj && obj.isMesh && obj.userData && obj.userData.tile) {
-                    tileHits.push({ tile: obj.userData.tile, distance: rawHits[i].distance });
-                }
-            }
-            if (tileHits.length === 0) return null;
+            // Fast raycast against cached pickableMeshes (no deep scene-graph traversal!)
+            const rawHits = this.raycaster.intersectObjects(this.pickableMeshes, false);
+            if (rawHits.length === 0) return null;
 
-            // If the first hit is navigable, return it immediately.
-            // If the first hit is a tall mainland cliff edge slightly overlapping a coastal water hex,
-            // prefer any reachable/navigable tile hit within 2.4 units of the first hit!
-            const firstHit = tileHits[0];
-            if (firstHit.tile.navigable) return firstHit.tile;
-            for (let i = 1; i < tileHits.length; i++) {
-                if (tileHits[i].tile.navigable && (tileHits[i].distance - firstHit.distance) <= 2.4) {
-                    return tileHits[i].tile;
+            const firstObj = rawHits[0].object;
+            const firstTile = firstObj && firstObj.userData ? firstObj.userData.tile : null;
+            if (!firstTile) return null;
+            if (firstTile.navigable) return firstTile;
+
+            for (let i = 1; i < rawHits.length; i++) {
+                const t = rawHits[i].object && rawHits[i].object.userData ? rawHits[i].object.userData.tile : null;
+                if (t && t.navigable && (rawHits[i].distance - rawHits[0].distance) <= 2.4 * WORLD_SCALE_4X) {
+                    return t;
                 }
             }
-            return firstHit.tile;
+            return firstTile;
         };
 
         this.renderer.domElement.addEventListener("pointerdown", (e) => {
-            // Only Left-Click (button === 0) interacts with hexes & custom path drawing; Right-Click rotates camera!
             if (e.button !== 0) return;
 
             pointerDownPos = { x: e.clientX, y: e.clientY };
@@ -1783,7 +1416,6 @@ class World3D {
             isLeftPointerDown = true;
             const now = performance.now();
 
-            // If already in Click-Draw mode (from a double-click without hold), clicking commits the drawn path!
             if (this.isClickDrawMode) {
                 this.isClickDrawMode = false;
                 this.isDrawingCustomPath = false;
@@ -1794,13 +1426,10 @@ class World3D {
                     this.onCustomPathCommit();
                 }
                 lastTapTime = 0;
-                lastTapTileKey = null;
                 return;
             }
 
             if (tile && tile.navigable) {
-                const tKey = `${tile.q},${tile.r}`;
-                // Double-click + Hold on the 2nd click enters Manual Drag-Path Mode!
                 if ((now - lastTapTime) <= 680 && this.onCustomPathStart) {
                     clearTimeout(this.singleClickTimer);
                     this.singleClickTimer = null;
@@ -1812,19 +1441,23 @@ class World3D {
                             this.renderer.domElement.setPointerCapture(e.pointerId);
                         } catch (_) {}
                         lastTapTime = 0;
-                        lastTapTileKey = null;
                         return;
                     }
                 }
                 lastTapTime = now;
-                lastTapTileKey = tKey;
             }
         });
 
         this.renderer.domElement.addEventListener("pointermove", (e) => {
+            const now = performance.now();
+            // Throttle hover raycasting to 30ms (~33Hz) when not actively drawing a path to eliminate mouse-move lag!
+            if (!this.isDrawingCustomPath && !this.isClickDrawMode && !isLeftPointerDown) {
+                if (now - lastHoverRaycastTime < 30) return;
+            }
+            lastHoverRaycastTime = now;
+
             const tile = pickTileAtClientPos(e.clientX, e.clientY);
 
-            // If currently holding & dragging a custom manual path (or in click-draw mode), append adjacent hexes live!
             if (this.isDrawingCustomPath || this.isClickDrawMode) {
                 if (tile && tile.navigable && this.onCustomPathStep) {
                     if (pointerDownTile && (tile.q !== pointerDownTile.q || tile.r !== pointerDownTile.r)) {
@@ -1835,7 +1468,6 @@ class World3D {
                 return;
             }
 
-            // Also allow direct Left-Click Hold + Drag across hexes to start custom path drawing automatically!
             if (isLeftPointerDown && pointerDownTile && pointerDownTile.navigable && tile && tile.navigable) {
                 const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
                 if ((tile.q !== pointerDownTile.q || tile.r !== pointerDownTile.r) && moveDist > 14 && this.onCustomPathStart) {
@@ -1865,8 +1497,8 @@ class World3D {
                     this.renderer.domElement.style.cursor = isReachable ? "pointer" : (tile.navigable ? "default" : "not-allowed");
 
                     if (isReachable) {
-                        tile.highlightRing.material.color.setHex(0x00f5d4);
-                        tile.highlightRing.material.opacity = 0.95;
+                        tile.highlightRing.material.color.setHex(0x6ee7b7);
+                        tile.highlightRing.material.opacity = 0.85;
                         this.showPathPreview(this.reachablePaths.get(key).path, false);
                     } else {
                         tile.highlightRing.material.opacity = 0.0;
@@ -1901,20 +1533,17 @@ class World3D {
                         this.onCustomPathCommit();
                     }
                 } else {
-                    // User double-clicked and released immediately -> stay in Click-Draw mode so moving mouse traces hexes and next click commits!
                     this.isClickDrawMode = true;
                 }
                 return;
             }
 
             const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
-            // Allow up to 28px pointer jitter so mouse clicks, trackpads, and tablet touch taps never drop!
             if (moveDist > 28) return;
 
             const tile = pickTileAtClientPos(e.clientX, e.clientY);
             if (tile && this.onHexClick) {
                 clearTimeout(this.singleClickTimer);
-                // Delay single-click auto-move by 240ms so a 2nd click (double-click!) can cancel it and start custom path drawing!
                 this.singleClickTimer = setTimeout(() => {
                     this.singleClickTimer = null;
                     if (!this.isDrawingCustomPath && !this.isClickDrawMode) {
@@ -1928,258 +1557,174 @@ class World3D {
     startRenderLoop() {
         const animate = () => {
             requestAnimationFrame(animate);
-            const delta = this.clock.getDelta();
+            const delta = Math.min(0.05, this.clock.getDelta());
             const elapsed = this.clock.getElapsedTime();
             const now = performance.now();
 
-            // 1. Dynamic Ocean Waves
+            // 1. Lightweight Ocean Swell (Zero vertex buffer recalculation!)
             if (this.oceanMesh) {
-                const pos = this.oceanMesh.geometry.attributes.position;
-                const amp = this.waveMultiplier || 1.0;
-                for (let i = 0; i < pos.count; i++) {
-                    const v = this.waterVertices[i];
-                    const wave1 = Math.sin(v.x * 0.22 + elapsed * 1.7 + v.phase) * 0.15 * amp;
-                    const wave2 = Math.cos(v.z * 0.20 + elapsed * 1.4) * 0.12 * amp;
-                    pos.setY(i, wave1 + wave2);
-                }
-                pos.needsUpdate = true;
-                this.oceanMesh.geometry.computeVertexNormals();
+                const amp = this.waveMultiplier || 0.70;
+                this.oceanMesh.position.y = (-0.20 + Math.sin(elapsed * 1.1) * 0.03 * amp) * WORLD_SCALE_4X;
             }
 
-            // 1b. Rain Particle Field (During Mưa Nhiệt Đới, Giông Bão & Siêu Bão Yagi)
+            // 1b. Rain Particle Field (Only during Rain / Storm)
             if (this.rainField && this.rainField.material.opacity > 0.01) {
                 const rPos = this.rainField.geometry.attributes.position;
-                const fallSpeed = 28 * delta;
+                const fallSpeed = 75 * delta;
                 for (let i = 0; i < rPos.count; i++) {
                     let y = rPos.getY(i) - fallSpeed;
-                    if (y < 0) y = 38;
+                    if (y < 0) y = 150;
                     rPos.setY(i, y);
                 }
                 rPos.needsUpdate = true;
             }
 
-            // 2. Sky Clouds (Only animate when visible)
+            // 2. Sky Clouds
             if (this.cloudsVisible) {
                 this.clouds.forEach(c => {
                     c.mesh.position.x += c.speed * delta;
-                    if (c.mesh.position.x > 86) c.mesh.position.x = -86;
+                    if (c.mesh.position.x > 340) c.mesh.position.x = -340;
                 });
             }
 
-            // 3. Foam Rings (Skipped in Minimalist Mode)
-            if (!this.minimalistMode) {
-                this.foamRings.forEach(f => {
-                    const s = 0.8 + Math.sin(elapsed * f.speed + f.offset) * 0.35;
-                    f.mesh.scale.set(s, s, s);
-                    f.mesh.material.opacity = 0.2 + Math.cos(elapsed * f.speed + f.offset) * 0.15;
-                });
-            }
-
-            // 4. Player Ships + High-Visibility Locator Rings + Local Player 3D Arrow Marker Animation
+            // 3. Player Ships: Prominent Scale & Spotlight when Docked on a Tile!
+            const occupiedHexKeys = new Set();
             let shipIdx = 0;
-            const wavePitch = (this.waveMultiplier || 1.0) * 0.048;
+            const wavePitch = (this.waveMultiplier || 0.70) * 0.028;
             this.shipMeshes.forEach((ship) => {
-                ship.rotation.z = Math.sin(elapsed * 2.2 + shipIdx) * wavePitch;
-                ship.rotation.x = Math.cos(elapsed * 1.8 + shipIdx) * (wavePitch * 0.75);
+                if (ship.visible && ship.userData.lastQ !== undefined && ship.userData.lastR !== undefined) {
+                    const key = `${ship.userData.lastQ},${ship.userData.lastR}`;
+                    occupiedHexKeys.add(key);
+
+                    // Make ship stand out prominently ("thuyền sẽ nổi bật hơn"):
+                    const baseSc = ship.userData.baseShipScale || (1.24 * WORLD_SCALE_4X);
+                    const targetShipSc = baseSc * 1.16;
+                    const curShipSc = ship.scale.x || baseSc;
+                    if (Math.abs(curShipSc - targetShipSc) > 0.01) {
+                        ship.scale.setScalar(curShipSc + (targetShipSc - curShipSc) * Math.min(1, delta * 8.0));
+                    }
+                    if (ship.userData.innerDisc) {
+                        ship.userData.innerDisc.material.opacity = 0.45 + Math.sin(elapsed * 3.0 + shipIdx) * 0.12;
+                    }
+                }
+                ship.rotation.z = Math.sin(elapsed * 2.0 + shipIdx) * wavePitch;
+                ship.rotation.x = Math.cos(elapsed * 1.6 + shipIdx) * (wavePitch * 0.75);
                 if (ship.userData.flag) {
-                    ship.userData.flag.rotation.y = Math.sin(elapsed * 5.8 + shipIdx) * 0.32;
+                    ship.userData.flag.rotation.y = Math.sin(elapsed * 4.2 + shipIdx) * 0.22;
                 }
                 if (ship.userData.mainSail) {
-                    const breath = 1.0 + Math.sin(elapsed * 2.6 + shipIdx) * 0.045;
+                    const breath = 1.0 + Math.sin(elapsed * 2.2 + shipIdx) * 0.032;
                     ship.userData.mainSail.scale.set(breath, 1.0, breath);
                 }
-                if (ship.userData.foreSail) {
-                    const breath2 = 1.0 + Math.cos(elapsed * 2.8 + shipIdx) * 0.045;
-                    ship.userData.foreSail.scale.set(breath2, 1.0, breath2);
-                }
-                // Pulse every ship's water locator ring on the horizontal XZ plane so all ships are easy to spot!
                 if (ship.userData.ring) {
-                    const rPulse = 1.0 + Math.sin(elapsed * 3.6 + shipIdx) * 0.08;
+                    const rPulse = 1.04 + Math.sin(elapsed * 2.8 + shipIdx) * 0.07;
                     ship.userData.ring.scale.set(rPulse, 1, rPulse);
                 }
                 if (ship.userData.localRadarRing) {
-                    const radarPulse = 1.0 + ((elapsed * 1.15) % 1.0) * 0.48;
+                    const radarPulse = 1.0 + ((elapsed * 0.9) % 1.0) * 0.36;
                     ship.userData.localRadarRing.scale.set(radarPulse, 1, radarPulse);
-                    ship.userData.localRadarRing.material.opacity = 0.90 * (1.0 - ((elapsed * 1.15) % 1.0) * 0.75);
+                    ship.userData.localRadarRing.material.opacity = 0.85 * (1.0 - ((elapsed * 0.9) % 1.0) * 0.70);
                 }
                 if (ship.userData.myArrowMarker) {
-                    ship.userData.myArrowMarker.position.y = 4.55 + Math.sin(elapsed * 4.5) * 0.28;
+                    ship.userData.myArrowMarker.position.y = 3.82 + Math.sin(elapsed * 3.8) * 0.20;
                     if (ship.userData.myArrowMarker.userData.headMesh) {
-                        ship.userData.myArrowMarker.userData.headMesh.rotation.y = elapsed * 2.6;
-                    }
-                    if (ship.userData.myArrowMarker.userData.haloMesh) {
-                        const pulse = 0.92 + Math.sin(elapsed * 5.0) * 0.22;
-                        ship.userData.myArrowMarker.userData.haloMesh.scale.set(pulse, 1, pulse);
+                        ship.userData.myArrowMarker.userData.headMesh.rotation.y = elapsed * 2.0;
                     }
                 }
                 shipIdx++;
             });
 
-            // 5. Animated Land Hex Diorama Props (Skipped in Minimalist Mode)
-            if (!this.minimalistMode) {
-                for (let i = 0; i < this.animatedLandProps.length; i++) {
-                    const item = this.animatedLandProps[i];
-                    if (!item.mesh || !item.mesh.visible) continue;
-                    if (item.type === "spin_z") {
-                        item.mesh.rotation.z += (item.speed || 1.5) * delta;
-                    } else if (item.type === "spin_y") {
-                        item.mesh.rotation.y += (item.speed || 1.2) * delta;
-                    } else if (item.type === "orbit_cloud") {
-                        item.mesh.position.x = item.basePos.x + Math.sin(elapsed * 0.8 + item.phase) * 0.22;
-                        item.mesh.position.z = item.basePos.z + Math.cos(elapsed * 0.7 + item.phase) * 0.18;
-                    } else if (item.type === "smoke_rise") {
-                        const cycle = (elapsed * 0.65 + item.phase) % 1.0;
-                        item.mesh.position.y = item.baseY + cycle * 0.55;
-                        const sc = 0.65 + cycle * 0.75;
-                        item.mesh.scale.setScalar(sc);
-                    } else if (item.type === "sway_flag") {
-                        item.mesh.rotation.y = Math.sin(elapsed * 3.5 + item.phase) * 0.25;
-                    } else if (item.type === "flicker_fire") {
-                        const sc = 0.85 + Math.sin(elapsed * 11.0 + item.phase) * 0.22;
-                        item.mesh.scale.set(sc, sc * 1.25, sc);
-                        item.mesh.rotation.y += 2.2 * delta;
-                    } else if (item.type === "bob_boat") {
-                        item.mesh.position.y = item.baseY + Math.sin(elapsed * 2.4 + item.phase) * 0.03;
-                        item.mesh.rotation.z = Math.sin(elapsed * 2.0 + item.phase) * 0.06;
-                    } else if (item.type === "shimmer_water") {
-                        const pulse = 0.92 + Math.sin(elapsed * 5.0 + item.phase) * 0.10;
-                        item.mesh.scale.set(pulse, 1.0, 1.0);
-                    }
-                }
-            }
+            // 4. Occupied-Tile Fade Effect ("Làm cho khi thuyền đi vào ô đó thuyền sẽ nổi bật hơn và ô đó sẽ mờ đi")!
+            const lerpRate = Math.min(1, delta * 9.0);
+            for (let i = 0; i < this.hexTiles.length; i++) {
+                const tile = this.hexTiles[i];
+                const isOccupied = occupiedHexKeys.has(`${tile.q},${tile.r}`);
 
-            // 6. Monument Radiant Beacons, Port & Resource Model Animations
-            this.hexTiles.forEach((tile, tIdx) => {
-                if (tile.monumentGlowGroup) {
-                    const mg = tile.monumentGlowGroup.userData;
-                    if (mg.outerHalo) {
-                        const s = 1.0 + Math.sin(elapsed * 3.2 + tIdx) * 0.12;
-                        mg.outerHalo.scale.set(s, s, 1);
-                    }
-                    if (mg.innerHalo) {
-                        mg.innerHalo.rotation.z = elapsed * 1.5;
-                    }
-                    if (mg.skyBeam) {
-                        mg.skyBeam.material.opacity = tile.monumentLocked
-                            ? 0.06
-                            : (0.18 + Math.sin(elapsed * 2.8 + tIdx) * 0.10);
-                    }
-                    if (mg.orbitOrbsGroup) {
-                        mg.orbitOrbsGroup.rotation.y = elapsed * 2.1 + tIdx;
-                        mg.orbitOrbsGroup.position.y = 1.45 + Math.sin(elapsed * 2.4 + tIdx) * 0.22;
+                // A. Fade the tile's baseMesh & rimMesh when occupied by a ship
+                const targetBaseOp = isOccupied ? 0.14 : tile.defaultBaseOpacity;
+                if (Math.abs(tile.baseMesh.material.opacity - targetBaseOp) > 0.008) {
+                    tile.baseMesh.material.opacity += (targetBaseOp - tile.baseMesh.material.opacity) * lerpRate;
+                }
+                if (tile.rimMesh) {
+                    const targetRimOp = isOccupied ? 0.02 : tile.defaultRimOpacity;
+                    if (Math.abs(tile.rimMesh.material.opacity - targetRimOp) > 0.005) {
+                        tile.rimMesh.material.opacity += (targetRimOp - tile.rimMesh.material.opacity) * lerpRate;
                     }
                 }
+
+                // B. Fade & shrink the tile's 3D propModel (Monument, Port, Resource, Reef, NPC) when occupied by a ship!
                 if (tile.propModel) {
-                    if (tile.monumentId && tile.propModel.userData.relicCrown) {
-                        tile.propModel.userData.relicCrown.rotation.y = elapsed * 1.8;
-                        tile.propModel.userData.relicCrown.position.y = 2.15 + Math.sin(elapsed * 2.5) * 0.10;
+                    const basePropScale = (tile.resourceType && tile.resourceCooldown > 0) ? 0.52 : 1.0;
+                    const targetPropScale = isOccupied ? (basePropScale * 0.68) : basePropScale;
+                    const curScale = tile.propModel.scale.x || 1.0;
+                    if (Math.abs(curScale - targetPropScale) > 0.006) {
+                        tile.propModel.scale.setScalar(curScale + (targetPropScale - curScale) * lerpRate);
                     }
-                    if (!this.minimalistMode) {
-                        if (tile.propModel.userData.spinZ) {
-                            tile.propModel.userData.spinZ.rotation.z = elapsed * 2.0;
-                        }
-                        if (tile.propModel.userData.spinY) {
-                            tile.propModel.userData.spinY.rotation.y = Math.sin(elapsed * 0.9) * 0.85;
-                        }
-                    }
-                    if (tile.hasNPC && tile.propModel.userData.gem) {
-                        tile.propModel.userData.gem.rotation.y = elapsed * 2.6;
-                    }
-                }
-            });
 
-            // 7. Ambient Ocean Wildlife & Fleet Animations (Skipped in Minimalist Mode)
-            if (!this.minimalistMode) {
-                if (this.ambientLighthouses) {
-                    this.ambientLighthouses.forEach((lh, idx) => {
-                        if (lh.userData.beam) {
-                            lh.userData.beam.rotation.y = elapsed * 0.9 + idx * 2.0;
+                    if (tile.propMeshes && tile.propMeshes.length > 0) {
+                        for (let m = 0; m < tile.propMeshes.length; m++) {
+                            const pm = tile.propMeshes[m];
+                            const mat = pm.material;
+                            const origOp = (mat.userData && mat.userData.baseOpacity !== undefined) ? mat.userData.baseOpacity : 1.0;
+                            const targetMeshOp = isOccupied ? (origOp * 0.22) : origOp;
+                            if (Math.abs(mat.opacity - targetMeshOp) > 0.01) {
+                                mat.transparent = true;
+                                mat.opacity += (targetMeshOp - mat.opacity) * lerpRate;
+                            }
                         }
-                    });
+                    }
+
+                    if (tile.monumentId && tile.propModel.userData.relicCrown) {
+                        tile.propModel.userData.relicCrown.rotation.y = elapsed * 1.4;
+                    }
                 }
-                if (this.ambientOilRigs) {
-                    this.ambientOilRigs.forEach((rig, idx) => {
-                        if (rig.userData.flame) {
-                            const s = 0.85 + Math.sin(elapsed * 8.0 + idx) * 0.22;
-                            rig.userData.flame.scale.set(s, s * 1.3, s);
-                        }
-                    });
+
+                // C. Fade Monument Halo Ring & Floating Label Sprite when occupied by a ship
+                if (tile.monumentGlowGroup && tile.monumentGlowGroup.userData.outerHalo) {
+                    const halo = tile.monumentGlowGroup.userData.outerHalo;
+                    const targetHaloOp = tile.monumentLocked ? 0.12 : (isOccupied ? 0.14 : 0.45);
+                    if (Math.abs(halo.material.opacity - targetHaloOp) > 0.01) {
+                        halo.material.opacity += (targetHaloOp - halo.material.opacity) * lerpRate;
+                    }
                 }
-                if (this.ambientSampans) {
-                    this.ambientSampans.forEach((sp, idx) => {
-                        sp.angle += sp.speed * delta;
-                        const nx = sp.centerX + Math.cos(sp.angle) * sp.radius;
-                        const nz = sp.centerZ + Math.sin(sp.angle) * (sp.radius * 0.85);
-                        const dx = nx - sp.mesh.position.x;
-                        const dz = nz - sp.mesh.position.z;
-                        sp.mesh.position.set(nx, -0.08 + Math.sin(elapsed * 2.0 + idx) * 0.05, nz);
-                        if (Math.hypot(dx, dz) > 0.001) {
-                            sp.mesh.rotation.y = -Math.atan2(dz, dx);
-                        }
-                    });
-                }
-                if (this.ambientDolphins) {
-                    this.ambientDolphins.forEach((dp) => {
-                        dp.angle += dp.speed * delta;
-                        const dx = dp.centerX + Math.cos(dp.angle) * dp.radius;
-                        const dz = dp.centerZ + Math.sin(dp.angle) * dp.radius;
-                        const leapArc = Math.sin(elapsed * 2.8 + dp.jumpPhase);
-                        const yPos = Math.max(-0.35, leapArc * 1.15);
-                        dp.mesh.position.set(dx, yPos, dz);
-                        dp.mesh.rotation.y = -dp.angle - Math.PI / 2;
-                        dp.mesh.rotation.z = Math.cos(elapsed * 2.8 + dp.jumpPhase) * 0.45;
-                    });
-                }
-                if (this.ambientFishSchools) {
-                    this.ambientFishSchools.forEach((fs) => {
-                        fs.mesh.rotation.y += fs.speed * delta;
-                    });
-                }
-                if (this.ambientSeagulls) {
-                    this.ambientSeagulls.forEach((sg, idx) => {
-                        sg.angle += sg.speed * delta;
-                        const gx = Math.cos(sg.angle) * sg.radius;
-                        const gz = Math.sin(sg.angle) * sg.radius;
-                        sg.mesh.position.set(gx, sg.height + Math.sin(elapsed * 2.5 + idx) * 0.4, gz);
-                        sg.mesh.rotation.y = -sg.angle - Math.PI / 2;
-                        if (sg.mesh.userData.wings) {
-                            const flap = Math.sin(elapsed * 7.5 + idx) * 0.38;
-                            sg.mesh.userData.wings.forEach(w => {
-                                w.wingL.rotation.z = flap;
-                                w.wingR.rotation.z = -flap;
-                            });
-                        }
-                    });
+                if (tile.labelSprite && tile.labelSprite.material) {
+                    const targetLabelOp = isOccupied ? 0.08 : 0.92;
+                    if (Math.abs(tile.labelSprite.material.opacity - targetLabelOp) > 0.01) {
+                        tile.labelSprite.material.opacity += (targetLabelOp - tile.labelSprite.material.opacity) * lerpRate;
+                    }
                 }
             }
 
-            // 8. Wake, Burst, Lightning Bolt & Monument Trap Effects
+            // 5. Wake, Burst, Lightning Bolt & Monument Trap Effects
             for (let i = this.floatingEffects.length - 1; i >= 0; i--) {
                 const fx = this.floatingEffects[i];
                 const age = now - fx.birth;
-                const progress = age / fx.life;
-                if (progress >= 1) {
+                if (age >= fx.life) {
                     this.effectsGroup.remove(fx.mesh);
                     this.floatingEffects.splice(i, 1);
-                } else if (fx.type === "wake") {
-                    const s = 1 + progress * 2.8;
+                    continue;
+                }
+                const progress = age / fx.life;
+                if (fx.type === "wake") {
+                    const s = 1 + progress * 2.2;
                     fx.mesh.scale.set(s, s, s);
-                    fx.mesh.material.opacity = 0.78 * (1 - progress);
+                    fx.mesh.material.opacity = (1 - progress) * 0.45;
                 } else if (fx.type === "burst") {
                     fx.mesh.position.x += fx.vx * 0.016;
                     fx.mesh.position.y += fx.vy * 0.016;
                     fx.mesh.position.z += fx.vz * 0.016;
-                    fx.vy -= 4.8 * 0.016;
-                    fx.mesh.rotation.x += 0.1;
-                    fx.mesh.rotation.y += 0.12;
+                    fx.vy -= 5.8 * WORLD_SCALE_4X * 0.016;
+                    fx.mesh.rotation.x += 0.12;
+                    fx.mesh.rotation.y += 0.15;
                     fx.mesh.material.opacity = 1 - progress;
                 } else if (fx.type === "lightning_bolt") {
-                    if (fx.beamMat) fx.beamMat.opacity = 0.85 * (1 - progress);
+                    const flash = (Math.floor(age / 55) % 2 === 0) ? 1.0 : 0.25;
+                    if (fx.beamMat) fx.beamMat.opacity = (1 - progress) * 0.75 * flash;
                     if (fx.ringMesh) {
-                        const rs = 1.0 + progress * 3.8;
-                        fx.ringMesh.scale.set(rs, rs, 1);
+                        const rs = 1 + progress * 4.2;
+                        fx.ringMesh.scale.set(rs, rs, rs);
                     }
-                    if (fx.ringMat) fx.ringMat.opacity = 0.95 * (1 - progress);
+                    if (fx.ringMat) fx.ringMat.opacity = (1 - progress) * 0.90;
                 } else if (fx.type === "trap_arrow") {
                     if (fx.mesh.position.y > fx.targetY) {
                         fx.mesh.position.y = Math.max(fx.targetY, fx.mesh.position.y + fx.vy * 0.016);
@@ -2192,14 +1737,14 @@ class World3D {
                         fx.mesh.position.y = fx.floorY;
                         fx.vy = Math.abs(fx.vy) * 0.45;
                     } else {
-                        fx.vy -= 12.0 * 0.016;
+                        fx.vy -= 12.0 * WORLD_SCALE_4X * 0.016;
                     }
-                    fx.mesh.rotation.x += 0.18;
-                    fx.mesh.rotation.z += 0.15;
+                    fx.mesh.rotation.x += 0.16;
+                    fx.mesh.rotation.z += 0.14;
                 }
             }
 
-            // 8.5. WASD / Arrow Keys Camera Panning (Moves view up/down/left/right across the map!)
+            // 6. WASD / Arrow Keys Camera Panning (Scaled 4x for the 4x World!)
             if (this.keyState && (this.keyState.w || this.keyState.s || this.keyState.a || this.keyState.d)) {
                 const moveF = (this.keyState.w ? 1 : 0) - (this.keyState.s ? 1 : 0);
                 const moveR = (this.keyState.d ? 1 : 0) - (this.keyState.a ? 1 : 0);
@@ -2211,23 +1756,24 @@ class World3D {
                     const dirZ = fz / fLen;
                     const rightX = -dirZ;
                     const rightZ = dirX;
-                    const panSpeed = 42 * delta;
+                    const panSpeed = 168 * delta;
                     const dx = (dirX * moveF + rightX * moveR) * panSpeed;
                     const dz = (dirZ * moveF + rightZ * moveR) * panSpeed;
-                    this.controls.target.x = Math.max(-75, Math.min(75, this.controls.target.x + dx));
-                    this.controls.target.z = Math.max(-75, Math.min(75, this.controls.target.z + dz));
+                    const maxBound = 360;
+                    this.controls.target.x = Math.max(-maxBound, Math.min(maxBound, this.controls.target.x + dx));
+                    this.controls.target.z = Math.max(-maxBound, Math.min(maxBound, this.controls.target.z + dz));
                     this.camera.position.x += dx;
                     this.camera.position.z += dz;
                 }
             }
 
-            // 9. Camera Follow Lock (Smoothly tracks the local player's ship in real time!)
+            // 7. Camera Follow Lock
             if (this.cameraLockEnabled && this.cameraLockShipKey) {
                 const lockedShip = this.shipMeshes.get(this.cameraLockShipKey);
                 if (lockedShip) {
                     const dx = lockedShip.position.x - this.controls.target.x;
                     const dz = lockedShip.position.z - this.controls.target.z;
-                    if (Math.hypot(dx, dz) > 0.001) {
+                    if (Math.hypot(dx, dz) > 0.005) {
                         const lerpFactor = Math.min(1, delta * 9.5);
                         this.controls.target.x += dx * lerpFactor;
                         this.controls.target.z += dz * lerpFactor;

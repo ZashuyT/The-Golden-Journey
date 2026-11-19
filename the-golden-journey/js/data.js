@@ -13,8 +13,8 @@ window.GAME_DATA = {
             code: "TDMNBB",
             name: "Trung du & Miền núi Bắc Bộ",
             enName: "Northern Midlands & Mountains",
-            color: "#2d7a36", // Lush Forest Emerald Green (matches reference map)
-            accent: "#1b5222",
+            color: "#4d7c5b", // Soft Sage Forest Green (pleasant, easy on the eyes)
+            accent: "#35583f",
             terrainDesc: "Địa hình núi cao hùng vĩ (Hoàng Liên Sơn), khối núi đá vôi Karst (Hà Giang, Cao Bằng, Hạ Long) và đồi bát úp trung du.",
             climateDesc: "Nhiệt đới ẩm gió mùa có mùa đông lạnh nhất cả nước do gió mùa Đông Bắc và độ cao địa hình.",
             strengths: "Khai thác khoáng sản số 1 cả nước (than Quảng Ninh, apatit Lào Cai, sắt Thái Nguyên), thủy điện trữ năng lớn nhất (Sơn La, Hòa Bình, Lai Châu), cây công nghiệp cận nhiệt (Chè) và du lịch sinh thái biển đảo.",
@@ -32,8 +32,8 @@ window.GAME_DATA = {
             code: "DBSH",
             name: "Đồng bằng Sông Hồng",
             enName: "Red River Delta",
-            color: "#f5b81c", // Bright Golden Harvest Yellow (matches reference map)
-            accent: "#c98a09",
+            color: "#d4a84f", // Soft Warm Wheat Ochre (gentle golden tone, no harsh glare)
+            accent: "#a37b2c",
             terrainDesc: "Đồng bằng châu thổ do phù sa hệ thống sông Hồng và sông Thái Bình bồi đắp, có hệ thống đê ngăn lũ lịch sử hàng ngàn năm.",
             climateDesc: "Nhiệt đới ẩm gió mùa có mùa đông lạnh, tạo lợi thế độc nhất để phát triển vụ Đông thành vụ sản xuất chính.",
             strengths: "Trình độ thâm canh lúa nước dẫn đầu cả nước (năng suất lúa tạ/ha cao nhất), trung tâm kinh tế - tài chính - khoa học công nghệ Hà Nội - Hải Phòng - Bắc Ninh.",
@@ -51,8 +51,8 @@ window.GAME_DATA = {
             code: "BTBDHMT",
             name: "Bắc Trung Bộ & Duyên hải Miền Trung",
             enName: "North Central & Central Coast",
-            color: "#5a7f91", // Coastal Citadel Slate Teal (matches reference map)
-            accent: "#3b5968",
+            color: "#5b8291", // Soft Coastal Slate Blue-Teal
+            accent: "#3f5d69",
             terrainDesc: "Lãnh thổ hẹp ngang, kéo dài dọc bờ biển; phía Tây là dãy Trường Sơn hùng vĩ, phía Đông là dải đồng bằng ven biển và nhiều vũng vịnh nước sâu.",
             climateDesc: "Mùa hạ có gió Phơn Tây Nam khô nóng; mùa mưa lệch về thu - đông kèm theo bão nhiệt đới từ Biển Đông.",
             strengths: "Kinh tế biển tổng hợp (hệ thống cảng nước sâu Nghi Sơn, Vũng Áng, Đà Nẵng, Dung Quất, Vân Phong, Cam Ranh; nghề cá, nghề muối Cà Ná - Sa Huỳnh) và Con đường Di sản Thế giới.",
@@ -70,8 +70,8 @@ window.GAME_DATA = {
             code: "TN",
             name: "Tây Nguyên",
             enName: "Central Highlands",
-            color: "#994920", // Rich Basalt Earth Brown-Sienna (matches reference map)
-            accent: "#6b3012",
+            color: "#9e6240", // Soft Warm Terracotta Basalt Earth
+            accent: "#734429",
             terrainDesc: "Các cao nguyên xếp tầng bề mặt rộng lớn (Kon Tum, Pleiku, Đắk Lắk, Mơ Nông, Lâm Viên, Di Linh) phủ lớp đất đỏ bazan dày màu mỡ.",
             climateDesc: "Cận xích đạo gió mùa phân hóa hai mùa mưa - khô rõ rệt; khí hậu mát mẻ trên các cao nguyên cao.",
             strengths: "Vùng chuyên canh cây công nghiệp lâu năm lớn nhất Việt Nam (Cà phê số 1 cả nước, hồ tiêu, cao su, chè Lâm Đồng), thủy điện bậc thang và trữ lượng quặng Bô-xít hàng tỷ tấn.",
@@ -89,8 +89,8 @@ window.GAME_DATA = {
             code: "DNB",
             name: "Đông Nam Bộ",
             enName: "Southeastern Region",
-            color: "#8a2430", // Deep Imperial Crimson-Burgundy (matches reference map)
-            accent: "#5e141d",
+            color: "#8f4850", // Soft Muted Rosewood Burgundy
+            accent: "#662f36",
             terrainDesc: "Địa hình bán bình nguyên chuyển tiếp từ cao nguyên xuống đồng bằng, độ cao 20–200m, giàu đất đỏ bazan và đất xám phù sa cổ.",
             climateDesc: "Cận xích đạo nóng ẩm quanh năm, nền nhiệt cao ổn định, rất ít chịu ảnh hưởng trực tiếp của bão.",
             strengths: "Đầu tàu kinh tế số 1 Việt Nam (dẫn đầu GDP, công nghiệp công nghệ cao, xuất nhập khẩu và thu hút FDI), khai thác dầu khí thềm lục địa (Bạch Hổ, Rồng, Lan Tây) và thủ phủ cây Cao su.",
@@ -108,8 +108,8 @@ window.GAME_DATA = {
             code: "DBSCL",
             name: "Đồng bằng Sông Cửu Long",
             enName: "Mekong River Delta",
-            color: "#659b38", // Vibrant Alluvial Lime-Olive Green (matches reference map)
-            accent: "#446e22",
+            color: "#6d9958", // Soft Alluvial Olive Meadow Green
+            accent: "#4c6e3b",
             terrainDesc: "Đồng bằng châu thổ rộng lớn nhất (~40.000 km²), địa hình thấp phẳng, mạng lưới sông Tiền - sông Hậu và kênh rạch chằng chịt.",
             climateDesc: "Cận xích đạo nóng ẩm, chế độ nước điều hòa kết hợp mùa nước nổi mang phù sa và nguồn lợi thủy sản phong phú.",
             strengths: "Vựa lúa số 1 Việt Nam (>50% sản lượng lúa và >90% xuất khẩu gạo cả nước), dẫn đầu về nuôi trồng & đánh bắt thủy sản (cá tra, tôm) và vựa trái cây nhiệt đới.",
@@ -1289,57 +1289,57 @@ window.GAME_DATA = {
         }
     ],
 
-    // 5 DISTINCT SHIP ARCHETYPES (Ultra-Clear High-Contrast Fleet Colors for Easy Identification)
+    // 5 DISTINCT SHIP ARCHETYPES (Balanced, Eye-Friendly & High-Clarity Fleet Colors)
     shipArchetypes: [
         {
             id: 0,
             name: "Hải Đội Hồng Hà",
-            vesselTitle: "Chiến Thuyền Lưỡng Long (Đỏ Rực)",
-            color: "#ff2424", // Vivid Crimson Red
-            sailColor: "#ff5252",
-            trimColor: "#ffd700",
+            vesselTitle: "Chiến Thuyền Lưỡng Long (Đỏ San Hô)",
+            color: "#e05a47", // Soft Warm Coral Red
+            sailColor: "#f7ebe6",
+            trimColor: "#e2b857",
             style: "dragon_junk",
-            desc: "Thuyền buồm cánh dơi đỏ rực mũi chạm đầu Rồng uy nghiêm của vùng châu thổ Bắc Bộ."
+            desc: "Thuyền buồm cánh dơi đỏ san hô mũi chạm đầu Rồng uy nghiêm của vùng châu thổ Bắc Bộ."
         },
         {
             id: 1,
             name: "Hải Đội Hạ Long",
-            vesselTitle: "Thương Thuyền Ngọc Lục Bảo (Xanh Lá)",
-            color: "#00e676", // Vivid Emerald Green
-            sailColor: "#69f0ae",
-            trimColor: "#ffd700",
+            vesselTitle: "Thương Thuyền Ngọc Bích (Xanh Ngọc)",
+            color: "#3ba776", // Soft Jade Emerald
+            sailColor: "#e8f6ef",
+            trimColor: "#e2b857",
             style: "emerald_catamaran",
-            desc: "Thuyền hai thân xanh ngọc lục bảo nổi bật giữa hàng ngàn đảo đá vôi kỳ vĩ."
+            desc: "Thuyền xanh ngọc bích thanh thoát nổi bật giữa hàng ngàn đảo đá vôi kỳ vĩ."
         },
         {
             id: 2,
             name: "Hải Đội Trường Sơn",
-            vesselTitle: "Hải Thuyền Đại Dương (Xanh Lam Sáng)",
-            color: "#00b0ff", // Electric Sky Cyan-Blue
-            sailColor: "#40c4ff",
-            trimColor: "#ffffff",
+            vesselTitle: "Hải Thuyền Đại Dương (Xanh Thiên Thanh)",
+            color: "#4399d8", // Soft Sky Azure
+            sailColor: "#eaf4fc",
+            trimColor: "#e2e8f0",
             style: "ocean_clipper",
-            desc: "Thuyền đi biển xanh lam rực sáng vượt sóng cả Duyên hải Miền Trung."
+            desc: "Thuyền đi biển xanh thiên thanh vượt sóng cả Duyên hải Miền Trung."
         },
         {
             id: 3,
             name: "Hải Đội Cửu Long",
-            vesselTitle: "Ghe Ngo Hoàng Kim (Vàng Kim)",
-            color: "#ffea00", // Sunburst Golden Yellow
-            sailColor: "#ffee58",
-            trimColor: "#ff6d00",
+            vesselTitle: "Ghe Ngo Hoàng Kim (Vàng Hổ Phách)",
+            color: "#e6b839", // Soft Warm Amber Gold
+            sailColor: "#fbf5e4",
+            trimColor: "#c87d28",
             style: "golden_galley",
-            desc: "Thuyền hoàng kim rực rỡ, linh hoạt luồn lách qua mọi vùng biển Nam Bộ."
+            desc: "Thuyền hoàng kim ấm áp, linh hoạt luồn lách qua mọi vùng biển Nam Bộ."
         },
         {
             id: 4,
             name: "Hải Đội Sài Gòn",
-            vesselTitle: "Viễn Dương Hạm Tím Huế (Tím Hồng)",
-            color: "#e040fb", // Vivid Royal Magenta-Purple
-            sailColor: "#ea80fc",
-            trimColor: "#ffd700",
+            vesselTitle: "Viễn Dương Hạm Tím Huế (Tím Thạch Anh)",
+            color: "#9d6cd8", // Soft Amethyst Violet
+            sailColor: "#f3ecfb",
+            trimColor: "#e2b857",
             style: "imperial_bark",
-            desc: "Thương thuyền viễn dương sắc tím ánh kim nổi bật kết nối các thương cảng quốc tế."
+            desc: "Thương thuyền viễn dương sắc tím thạch anh thanh lịch kết nối các thương cảng quốc tế."
         }
     ],
 

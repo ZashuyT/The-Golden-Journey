@@ -282,7 +282,7 @@ class GoldenJourneyGame {
                         <button class="btn-secondary" onclick="window.GAME.openRulebookModal()">📜 Luật Chơi</button>
                     </div>
                     <div style="display:flex; gap:8px; flex-wrap:wrap">
-                        <button class="btn-trade-action gold" onclick="window.GAME.startSoloSandboxMode()" style="background:linear-gradient(135deg,#c026d3,#7e22ce); color:#fff; border:1px solid #f0abfc; box-shadow:0 4px 14px rgba(192,38,211,0.4)">
+                        <button class="btn-trade-action gold" onclick="window.GAME.startSoloSandboxMode()" style="background:linear-gradient(135deg,#8c5820,#6b3f12); color:#fff8e7; border:1.5px solid #e6b84a">
                             🛠️ Chế Độ Sáng Tạo (Sandbox 1 Mình)
                         </button>
                         <button class="btn-trade-action" onclick="window.GAME.startQuickSinglePlayerWithBots()">
@@ -453,9 +453,6 @@ class GoldenJourneyGame {
                 </div>
                 ${this.roomState.isHost ? `
                     <div style="display:flex; gap:8px; flex-wrap:wrap">
-                        <button class="btn-trade-action" style="background:linear-gradient(135deg,#c026d3,#7e22ce); color:#fff; border:1px solid #f0abfc; padding:9px 14px; font-weight:800" onclick="window.GAME.startRoomGameSession(true)">
-                            🛠️ Vào Chế Độ Sáng Tạo (Sandbox)
-                        </button>
                         <button class="btn-primary-gold" ${canStart ? '' : 'disabled'} onclick="window.GAME.startRoomGameSession(false)">
                             🚀 Bắt Đầu Ván Đấu (${activeSeats.length} Người)
                         </button>
@@ -878,9 +875,7 @@ class GoldenJourneyGame {
         this.roomState.code = null;
         this.roomState.isHost = true;
         this.roomState.status = "turn_order_quiz";
-        this.sandboxMode = false;
-        this.sandboxInfiniteMove = false;
-        this.sandboxTeleport = false;
+        this.disableSandboxCreativeMode();
         this.hideWaitingScreenAndShowHUD();
         this.initializeMatchBoardAndShips(4, 1, null);
 
@@ -933,17 +928,16 @@ class GoldenJourneyGame {
             clientId: s.clientId
         }));
 
-        const isSoloOrSandbox = Boolean(enableSandbox || activeSeats.length === 1);
-        this.roomState.status = isSoloOrSandbox ? "playing" : "turn_order_quiz";
+        const isExplicitSandbox = Boolean(enableSandbox);
+        const skipQuizForSolo = Boolean(isExplicitSandbox || activeSeats.length === 1);
+        this.roomState.status = skipQuizForSolo ? "playing" : "turn_order_quiz";
         this.hideWaitingScreenAndShowHUD();
         this.initializeMatchBoardAndShips(customConfigs.length, customConfigs.filter(c => !c.isAI).length, customConfigs);
 
-        if (isSoloOrSandbox) {
+        if (isExplicitSandbox) {
             this.enableSandboxCreativeMode(true);
         } else {
-            this.sandboxMode = false;
-            this.sandboxInfiniteMove = false;
-            this.sandboxTeleport = false;
+            this.disableSandboxCreativeMode();
         }
 
         const openingQuiz = this.pickRandomOpeningSpeedQuiz();
@@ -958,7 +952,7 @@ class GoldenJourneyGame {
                         code: this.roomState.code,
                         gameState: stateSnapshot,
                         openingQuiz,
-                        skipOpeningQuiz: isSoloOrSandbox
+                        skipOpeningQuiz: skipQuizForSolo
                     })
                 });
                 const data = await resp.json();
@@ -967,7 +961,7 @@ class GoldenJourneyGame {
                     this.roomState.status = data.room.status;
                     if (data.room.status === "playing") {
                         this.beginTurn();
-                        if (isSoloOrSandbox) {
+                        if (isExplicitSandbox) {
                             this.showToast("🛠️ Đã bắt đầu phòng chơi Chế Độ Sáng Tạo (Sandbox)!");
                         }
                         return;
@@ -977,7 +971,7 @@ class GoldenJourneyGame {
                     }
                 }
             } catch (e) {
-                if (isSoloOrSandbox) {
+                if (skipQuizForSolo) {
                     this.beginTurn();
                     return;
                 }
@@ -988,9 +982,9 @@ class GoldenJourneyGame {
                 type: "ROOM_OPENING_QUIZ_STARTED",
                 roomState: this.roomState,
                 gameState: stateSnapshot,
-                openingQuiz: isSoloOrSandbox ? null : { quiz: openingQuiz, startedAt: Date.now(), completed: false, rankings: [] }
+                openingQuiz: skipQuizForSolo ? null : { quiz: openingQuiz, startedAt: Date.now(), completed: false, rankings: [] }
             });
-        } else if (isSoloOrSandbox) {
+        } else if (skipQuizForSolo) {
             this.beginTurn();
         }
     }
@@ -1454,6 +1448,7 @@ class GoldenJourneyGame {
         return {
             roundNumber: this.roundNumber,
             activePlayerIdx: this.activePlayerIdx,
+            sandboxMode: Boolean(this.sandboxMode),
             monumentAssignments: this.monumentAssignments,
             players: this.players,
             marketListings: this.marketListings,
@@ -1471,6 +1466,10 @@ class GoldenJourneyGame {
 
     applySerializedGameState(state, rebuildBoard = false) {
         if (!state || !state.players) return;
+
+        if (!state.sandboxMode) {
+            this.disableSandboxCreativeMode();
+        }
 
         const prevActiveIdx = this.activePlayerIdx;
         const prevRound = this.roundNumber;
@@ -4707,7 +4706,7 @@ class GoldenJourneyGame {
         this.world.setCameraLockTarget(localP);
         this.updateClockAndTickerUI();
 
-        document.getElementById("hud-round").textContent = `Vòng ${this.roundNumber}`;
+        document.getElementById("hud-round").textContent = `🌀 V${this.roundNumber}`;
 
         const mktBadge = document.getElementById("market-count-badge");
         if (mktBadge) {
@@ -4720,16 +4719,16 @@ class GoldenJourneyGame {
             myShipEl.style.cursor = "pointer";
             myShipEl.title = "Bấm để đưa góc nhìn về thuyền của bạn";
             myShipEl.onclick = () => this.world.focusCameraOnHex(localP.q, localP.r);
-            myShipEl.innerHTML = `<span class="fleet-dot" style="background:${localP.color}"></span> ⛵ Bạn: <strong>${localP.name}</strong>`;
+            myShipEl.innerHTML = `<span class="fleet-dot" style="background:${localP.color}"></span> ⛵ <strong>${localP.name}</strong>`;
         }
 
         const turnStatusEl = document.getElementById("hud-turn-status");
         if (turnStatusEl) {
             if (myTurn) {
-                turnStatusEl.innerHTML = `🎯 Lượt bạn (${p.ap}/5 AP)`;
+                turnStatusEl.innerHTML = `🎯 Lượt bạn (${p.ap} AP)`;
                 turnStatusEl.className = "hud-pill turn-pill my-turn";
             } else {
-                turnStatusEl.innerHTML = `👁️ Lượt: ${p.name}`;
+                turnStatusEl.innerHTML = `👁️ ${p.name}`;
                 turnStatusEl.className = "hud-pill turn-pill spectator-turn";
             }
         }
@@ -5345,11 +5344,24 @@ class GoldenJourneyGame {
     }
 
     // ------------------------------------------------------------------------
-    // MINECRAFT-STYLE SANDBOX / CREATIVE MODE CONTROLS (CHẾ ĐỘ SÁNG TẠO)
+    // MINECRAFT-STYLE SANDBOX / CREATIVE MODE CONTROLS (STRICTLY SANDBOX ONLY!)
+    // Outside of Sandbox mode, all creative/cheat features & UI are hidden & disabled!
     // ------------------------------------------------------------------------
+    disableSandboxCreativeMode() {
+        this.sandboxMode = false;
+        this.sandboxInfiniteMove = false;
+        this.sandboxTeleport = false;
+        const sbBtn = document.getElementById("btn-toggle-sandbox");
+        if (sbBtn) sbBtn.classList.add("hidden");
+        const sbPanel = document.getElementById("sandbox-creative-panel");
+        if (sbPanel) sbPanel.classList.add("hidden");
+    }
+
     enableSandboxCreativeMode(openPanel = true) {
         this.sandboxMode = true;
         this.sandboxInfiniteMove = true;
+        const sbBtn = document.getElementById("btn-toggle-sandbox");
+        if (sbBtn) sbBtn.classList.remove("hidden");
         const infBtn = document.getElementById("btn-sb-inf-move") || document.getElementById("sb-btn-inf-move");
         if (infBtn) {
             infBtn.classList.add("active");
@@ -5363,25 +5375,22 @@ class GoldenJourneyGame {
         this.updateUI();
     }
 
-    toggleSandboxPanel() {
+    toggleSandboxPanel(forceState = undefined) {
+        if (!this.sandboxMode) return;
         window.SFX.playClick();
         const sbPanel = document.getElementById("sandbox-creative-panel");
         if (!sbPanel) return;
-        const willOpen = sbPanel.classList.contains("hidden");
+        const willOpen = forceState !== undefined ? Boolean(forceState) : sbPanel.classList.contains("hidden");
         if (willOpen) {
             sbPanel.classList.remove("hidden");
-            if (!this.sandboxMode) {
-                this.enableSandboxCreativeMode(true);
-                this.showToast("🛠️ Đã bật Chế Độ Sáng Tạo (Sandbox)! Tự do di chuyển vô hạn & tùy chỉnh tài nguyên!");
-            }
         } else {
             sbPanel.classList.add("hidden");
         }
     }
 
     toggleSandboxInfiniteMove() {
+        if (!this.sandboxMode) return;
         window.SFX.playClick();
-        this.sandboxMode = true;
         this.sandboxInfiniteMove = !this.sandboxInfiniteMove;
         const btn = document.getElementById("btn-sb-inf-move") || document.getElementById("sb-btn-inf-move");
         if (btn) {
@@ -5401,8 +5410,8 @@ class GoldenJourneyGame {
     }
 
     toggleSandboxTeleport() {
+        if (!this.sandboxMode) return;
         window.SFX.playClick();
-        this.sandboxMode = true;
         this.sandboxTeleport = !this.sandboxTeleport;
         const btn = document.getElementById("btn-sb-teleport") || document.getElementById("sb-btn-teleport");
         if (btn) {
@@ -5415,6 +5424,7 @@ class GoldenJourneyGame {
     }
 
     sandboxTriggerInstantWin() {
+        if (!this.sandboxMode) return;
         window.SFX.playRelicFanfare();
         const p = this.getLocalPlayer() || this.getActivePlayer();
         if (!p) return;
@@ -5432,6 +5442,7 @@ class GoldenJourneyGame {
     }
 
     sandboxAdjustStat(stat, delta) {
+        if (!this.sandboxMode) return;
         window.SFX.playCoin();
         const p = this.getLocalPlayer() || this.getActivePlayer();
         if (!p) return;
@@ -5454,6 +5465,7 @@ class GoldenJourneyGame {
     }
 
     sandboxAdjustKeys(delta) {
+        if (!this.sandboxMode) return;
         window.SFX.playCoin();
         const p = this.getLocalPlayer() || this.getActivePlayer();
         if (!p) return;
@@ -5466,6 +5478,7 @@ class GoldenJourneyGame {
     }
 
     sandboxGrantSerpentCoin() {
+        if (!this.sandboxMode) return;
         window.SFX.playRelicFanfare();
         const p = this.getLocalPlayer() || this.getActivePlayer();
         if (!p) return;
@@ -5476,6 +5489,7 @@ class GoldenJourneyGame {
     }
 
     sandboxResetPortMarket() {
+        if (!this.sandboxMode) return;
         window.SFX.playCoin();
         this.resetAllPortInventories(true);
         this.updateUI();
@@ -5483,6 +5497,7 @@ class GoldenJourneyGame {
     }
 
     sandboxSetWeatherPhase(phaseKey) {
+        if (!this.sandboxMode) return;
         window.SFX.playClick();
         const startSecondsMap = {
             sunny: 0,
@@ -5502,6 +5517,7 @@ class GoldenJourneyGame {
     }
 
     sandboxAdjustRelic(delta) {
+        if (!this.sandboxMode) return;
         window.SFX.playRelicFanfare();
         const p = this.getLocalPlayer() || this.getActivePlayer();
         if (!p) return;
@@ -5531,6 +5547,7 @@ class GoldenJourneyGame {
     }
 
     sandboxResetCooldowns() {
+        if (!this.sandboxMode) return;
         window.SFX.playMine();
         this.world.hexTiles.forEach(t => {
             t.resourceCooldown = 0;
@@ -5557,6 +5574,7 @@ class GoldenJourneyGame {
     }
 
     sandboxSpawnNPC() {
+        if (!this.sandboxMode) return;
         window.SFX.playCoin();
         const tile = this.world.spawnRareNPCOnRandomSeaHex();
         if (tile) {
@@ -5695,7 +5713,7 @@ class GoldenJourneyGame {
                 window.SFX.playClick();
                 const targetP = this.getLocalPlayer() || this.getActivePlayer();
                 const locked = this.world.toggleCameraLock(targetP);
-                camLockBtn.textContent = locked ? "🔒 Khóa Góc Nhìn: Bật" : "🔒 Khóa Góc Nhìn: Tắt";
+                camLockBtn.textContent = locked ? "🔒 Cam: Bật" : "🔒 Cam: Tắt";
                 camLockBtn.classList.toggle("active-lock-btn", locked);
                 this.showToast(locked
                     ? "🔒 Đã BẬT Khóa Góc Nhìn! Camera sẽ tự động di chuyển bám theo thuyền của bạn!"
@@ -5707,11 +5725,11 @@ class GoldenJourneyGame {
             minModeBtn.addEventListener("click", () => {
                 window.SFX.playClick();
                 const minimal = this.world.toggleMinimalistMode();
-                minModeBtn.textContent = minimal ? "🌿 Tối Giản: Bật" : "🌿 Tối Giản: Tắt";
+                minModeBtn.textContent = minimal ? "🌿 Tối Giản: Bật" : "🌿 Tối Giản";
                 minModeBtn.classList.toggle("active-minimalist-btn", minimal);
                 this.showToast(minimal
-                    ? "🌿 Đã BẬT Chế Độ Tối Giản! Đã tắt chim, cá, thuyền nhỏ và các hiệu ứng đèn/khói phụ."
-                    : "✨ Đã TẮT Chế Độ Tối Giản! Đã bật lại toàn bộ sinh vật biển, chim bay và hiệu ứng.");
+                    ? "🌿 Đã BẬT Chế Độ Tối Giản!"
+                    : "✨ Đã TẮT Chế Độ Tối Giản!");
             });
         }
         const cloudsBtn = document.getElementById("btn-toggle-clouds");
@@ -5719,7 +5737,7 @@ class GoldenJourneyGame {
             cloudsBtn.addEventListener("click", () => {
                 window.SFX.playClick();
                 const visible = this.world.toggleClouds();
-                cloudsBtn.textContent = visible ? "☁️ Mây: Bật" : "☁️ Mây: Tắt";
+                cloudsBtn.textContent = visible ? "☁️ Mây" : "☁️ Mây: Tắt";
                 cloudsBtn.classList.toggle("active-cloud-btn", visible);
                 this.showToast(visible ? "☁️ Đã BẬT hiển thị các đám mây trên bầu trời!" : "🌤️ Đã TẮT toàn bộ đám mây trên trời để nhìn bản đồ thoáng hơn!");
             });
